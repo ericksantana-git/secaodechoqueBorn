@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seção de Choque Diferencial (Aproximação de Born) - Comparativo MC</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="text/javascript" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 900px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        select, input[type="number"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .chart-container {
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            width: 100% !important;
+            height: 400px !important; /* Altura para cada gráfico */
+            margin-top: 20px;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+        .param-inputs {
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        .param-inputs.active {
+            display: grid;
+        }
+        .equation-display {
+            text-align: center;
+            font-size: 1.1em;
+            margin-top: 15px;
+            margin-bottom: 25px;
+            padding: 10px;
+            background-color: #e9e9e9;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Seção de Choque Diferencial (Aproximação de Born) - Comparativo MC</h1>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="potentialSelect">Selecione o Potencial:</label>
+                <select id="potentialSelect">
+                    <option value="rutherford">Rutherford (Coulomb)</option>
+                    <option value="yukawa">Yukawa</option>
+                    <option value="gaussian">Gaussiano</option>
+                    <option value="soft_sphere_repulsive">Esfera Mole Repulsiva (Tipo 1/r)</option>
+                    <option value="finite_square_well">Poço Quadrado Finito</option>
+                    <option value="hydrogen_atom">Átomo de Hidrogênio (Estado Fundamental)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="particleEnergy">Energia da Partícula (eV):</label>
+                <input type="number" id="particleEnergy" value="5000" step="100">
+            </div>
+            <div class="control-group">
+                <label for="thetaMin">Ângulo Mínimo (°):</label>
+                <input type="number" id="thetaMin" value="0.1" step="0.1" min="0">
+            </div>
+            <div class="control-group">
+                <label for="thetaMax">Ângulo Máximo (°):</label>
+                <input type="number" id="thetaMax" value="25" step="1" max="25">
+            </div>
+            <div class="control-group">
+                <label for="numThetaPoints">Número de Pontos de Ângulo:</label>
+                <input type="number" id="numThetaPoints" value="500" step="50" min="50">
+            </div>
+            <div class="control-group">
+                <label for="numMCSamples">Amostras Monte Carlo:</label>
+                <input type="number" id="numMCSamples" value="500" step="100" min="10">
+            </div>
+        </div>
+
+        <div id="rutherford-params" class="param-inputs active">
+            <div class="control-group">
+                <label for="rutherfordZ1">Carga Z1:</label>
+                <input type="number" id="rutherfordZ1" value="1" step="1" min="1">
+            </div>
+            <div class="control-group">
+                <label for="rutherfordZ2">Carga Z2:</label>
+                <input type="number" id="rutherfordZ2" value="79" step="1" min="1">
+            </div>
+        </div>
+
+        <div id="yukawa-params" class="param-inputs">
+            <div class="control-group">
+                <label for="yukawaG">Parâmetro g:</label>
+                <input type="number" id="yukawaG" value="1e-28" step="1e-29">
+            </div>
+            <div class="control-group">
+                <label for="yukawaMu">Parâmetro μ (m⁻¹):</label>
+                <input type="number" id="yukawaMu" value="1e10" step="1e9">
+            </div>
+        </div>
+
+        <div id="gaussian-params" class="param-inputs">
+            <div class="control-group">
+                <label for="gaussianA">Parâmetro A:</label>
+                <input type="number" id="gaussianA" value="1e-25" step="1e-26">
+            </div>
+            <div class="control-group">
+                <label for="gaussianAlpha">Parâmetro α (m⁻²):</label>
+                <input type="number" id="gaussianAlpha" value="1e20" step="1e19">
+            </div>
+        </div>
+
+        <div id="softSphere-params" class="param-inputs">
+            <div class="control-group">
+                <label for="softSphereV0R">V0*R (J.m):</label>
+                <input type="number" id="softSphereV0R" value="1e-27" step="1e-28">
+            </div>
+        </div>
+
+        <div id="finiteSquareWell-params" class="param-inputs">
+            <div class="control-group">
+                <label for="finiteWellV0">Profundidade V0 (J):</label>
+                <input type="number" id="finiteWellV0" value="1.60218e-17" step="1e-18"> </div>
+            <div class="control-group">
+                <label for="finiteWellA">Raio a (m):</label>
+                <input type="number" id="finiteWellA" value="1e-10" step="1e-11">
+            </div>
+        </div>
+
+        <div id="hydrogenAtom-params" class="param-inputs">
+            <p>Este potencial usa constantes físicas (carga do elétron, raio de Bohr) e não possui parâmetros ajustáveis diretamente pelo usuário.</p>
+        </div>
+        
+        <div class="equation-display" id="equationDisplay">
+            $$ \frac{d\sigma}{d\Omega} = \left(\frac{m}{2\pi\hbar^2}\right)^2 |V(q)|^2 $$
+            <br>
+            $$ q = 2k \sin(\theta/2) $$
+            <br>
+            <span id="VqEquation">$$ V(q) = \frac{Z_1 Z_2 e^2}{\epsilon_0 q^2} $$</span>
+        </div>
+
+        <h2>Resultado Analítico (Aproximação de Born)</h2>
+        <div class="chart-container">
+            <canvas id="analyticalCrossSectionChart"></canvas>
+        </div>
+
+        <h2>Resultado Simulação Monte Carlo (Média)</h2>
+        <div class="chart-container">
+            <canvas id="mcCrossSectionChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Constantes físicas
+        const hbar = 1.054571817e-34; // J.s
+        const m_e = 9.1093837015e-31; // kg (massa do elétron)
+        const e = 1.602176634e-19;   // C (carga elementar)
+        const epsilon_0 = 8.8541878128e-12; // F/m (permissividade do vácuo)
+        const a0 = 5.29177210903e-11; // m (Raio de Bohr)
+
+        // Referências aos elementos HTML
+        const potentialSelect = document.getElementById('potentialSelect');
+        const particleEnergyInput = document.getElementById('particleEnergy');
+        const thetaMinInput = document.getElementById('thetaMin');
+        const thetaMaxInput = document.getElementById('thetaMax');
+        const numThetaPointsInput = document.getElementById('numThetaPoints');
+        const numMCSamplesInput = document.getElementById('numMCSamples');
+        
+        const ctxAnalytical = document.getElementById('analyticalCrossSectionChart').getContext('2d');
+        const ctxMC = document.getElementById('mcCrossSectionChart').getContext('2d');
+        const VqEquationDisplay = document.getElementById('VqEquation');
+
+        // Referências aos grupos de parâmetros específicos do potencial
+        const paramGroups = {
+            'rutherford': document.getElementById('rutherford-params'),
+            'yukawa': document.getElementById('yukawa-params'),
+            'gaussian': document.getElementById('gaussian-params'),
+            'soft_sphere_repulsive': document.getElementById('softSphere-params'),
+            'finite_square_well': document.getElementById('finiteSquareWell-params'),
+            'hydrogen_atom': document.getElementById('hydrogenAtom-params')
+        };
+
+        let analyticalChart;
+        let mcChart;
+
+        // --- Funções Auxiliares para Estatística (equivalente a numpy) ---
+
+        // Box-Muller Transform para gerar números aleatórios com distribuição normal
+        let z2 = null; // Armazenar o segundo valor para otimização
+        function randomNormal(mean, stdDev) {
+            let z1;
+            if (z2 !== null) {
+                z1 = z2;
+                z2 = null;
+            } else {
+                let u1 = Math.random();
+                let u2 = Math.random();
+                z1 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+                z2 = Math.sqrt(-2.0 * Math.log(u1)) * Math.sin(2.0 * Math.PI * u2);
+            }
+            return z1 * stdDev + mean;
+        }
+
+        function calculateMean(arr) {
+            if (arr.length === 0) return 0;
+            return arr.reduce((sum, val) => sum + val, 0) / arr.length;
+        }
+
+        function calculateStdDev(arr, mean) {
+            if (arr.length === 0) return 0;
+            const sqDiffs = arr.map(val => Math.pow((val - mean), 2));
+            return Math.sqrt(calculateMean(sqDiffs));
+        }
+
+        // --- Funções para as Transformadas de Fourier dos Potenciais (Portadas do Python) ---
+        function V_q_yukawa(q, g, mu) {
+            // Added Math.pow for clarity and consistency
+            return 4 * Math.PI * g / (Math.pow(q, 2) + Math.pow(mu, 2) + Number.EPSILON); // Use Number.EPSILON for small numbers
+        }
+
+        function V_q_rutherford(q, Z1, Z2) {
+            // Added Math.pow for clarity and consistency
+            return (Z1 * Z2 * Math.pow(e, 2)) / (epsilon_0 * (Math.pow(q, 2) + Number.EPSILON)); // Use Number.EPSILON
+        }
+
+        function V_q_gaussian(q, A, alpha) {
+            return A * Math.pow(Math.PI / alpha, 1.5) * Math.exp(-Math.pow(q, 2) / (4 * alpha));
+        }
+
+        function V_q_soft_sphere_repulsive(q, V0_R_product) {
+            // Added Math.pow for clarity and consistency
+            return (4 * Math.PI * V0_R_product) / (Math.pow(q, 2) + Number.EPSILON); // Use Number.EPSILON
+        }
+
+        function V_q_finite_square_well(q, V0_well, a_well) {
+            const calculateSingleQ = (qi) => {
+                if (Math.abs(qi) < Number.EPSILON) { // Use Number.EPSILON for comparison with small numbers
+                    return -4 * Math.PI * V0_well * Math.pow(a_well, 3) / 3;
+                } else {
+                    return -4 * Math.PI * V0_well * (Math.sin(qi * a_well) - qi * a_well * Math.cos(qi * a_well)) / (Math.pow(qi, 3) + Number.EPSILON); // Use Number.EPSILON
+                }
+            };
+            return Array.isArray(q) ? q.map(calculateSingleQ) : calculateSingleQ(q);
+        }
+
+        function V_q_hydrogen_atom(q) {
+            const qa0_half_squared = Math.pow(q * a0 / 2, 2);
+            const F_q = 1.0 / Math.pow(1.0 + qa0_half_squared, 2);
+            // Added Math.pow for clarity and consistency
+            return -(Math.pow(e, 2) / (epsilon_0 * (Math.pow(q, 2) + Number.EPSILON))) * (1.0 - F_q); // Use Number.EPSILON
+        }
+
+        // Equações LaTeX para V(q) para exibição
+        const VqEquations = {
+            'rutherford': `$$ V(q) = \\frac{Z_1 Z_2 e^2}{\\epsilon_0 q^2} $$`,
+            'yukawa': `$$ V(q) = \\frac{4 \\pi g}{q^2 + \\mu^2} $$`,
+            'gaussian': `$$ V(q) = A \\left(\\frac{\\pi}{\\alpha}\\right)^{3/2} e^{-q^2 / (4\\alpha)} $$`,
+            'soft_sphere_repulsive': `$$ V(q) = \\frac{4 \\pi (V_0 R)}{q^2} \\quad \\text{(onde } V_0 R \\text{ é o produto passado)} $$`,
+            'finite_square_well': `$$ V(q) = -\\frac{4 \\pi V_0 a^3}{3} \\frac{3}{ (qa)^3 } (\\sin(qa) - qa \\cos(qa)) $$`,
+            'hydrogen_atom': `$$ V(q) = -\\frac{e^2}{\\epsilon_0 q^2} \\left(1 - \\frac{1}{(1 + (qa_0/2)^2)^2}\\right) $$`
+        };
+
+        // --- Função Principal para Calcular a Seção de Choque Diferencial (Analítica) ---
+        function born_differential_cross_section(theta_rad, m, k, potential_type, params) {
+            const sin_theta_half = Math.sin(theta_rad / 2);
+            const q = 2 * k * sin_theta_half;
+
+            let V_q_result;
+            switch (potential_type) {
+                case 'yukawa': V_q_result = V_q_yukawa(q, params.g, params.mu); break;
+                case 'rutherford': V_q_result = V_q_rutherford(q, params.Z1, params.Z2); break;
+                case 'gaussian': V_q_result = V_q_gaussian(q, params.A, params.alpha); break;
+                case 'soft_sphere_repulsive': V_q_result = V_q_soft_sphere_repulsive(q, params.V0_R_product); break;
+                case 'finite_square_well': V_q_result = V_q_finite_square_well(q, params.V0_well, params.a_well); break;
+                case 'hydrogen_atom': V_q_result = V_q_hydrogen_atom(q); break;
+                default: console.error("Tipo de potencial não suportado."); return 0;
+            }
+            
+            // Ensure V_q_abs_squared is handled correctly for both scalar and array results
+            let V_q_abs_squared = Array.isArray(V_q_result) ? V_q_result.map(val => Math.pow(Math.abs(val), 2)) : Math.pow(Math.abs(V_q_result), 2);
+
+            const constant_factor = Math.pow(m / (2 * Math.PI * hbar * hbar), 2); // Corrected hbar squared to hbar * hbar or Math.pow(hbar, 2)
+            
+            // Ensure the return is an array if V_q_abs_squared is an array
+            return Array.isArray(V_q_abs_squared) ? V_q_abs_squared.map(val => constant_factor * val) : constant_factor * V_q_abs_squared;
+        }
+
+        // --- Função para Executar a Simulação Monte Carlo ---
+        function runMonteCarloSimulation(theta_radians, m, k, potential_type, base_params, n_samples_mc) {
+            const mean_mc_cross_section_per_angle = new Array(theta_radians.length).fill(0);
+            const std_mc_cross_section_per_angle = new Array(theta_radians.length).fill(0);
+
+            // Definir incertezas (desvio padrão) para os parâmetros do potencial
+            const mc_potential_params_std_dev = {};
+
+            switch (potential_type) {
+                case 'yukawa':
+                    mc_potential_params_std_dev.g = base_params.g * 0.02;
+                    mc_potential_params_std_dev.mu = base_params.mu * 0.02;
+                    break;
+                case 'rutherford':
+                    mc_potential_params_std_dev.Z1 = 0; // Z1 and Z2 are typically integers and not sampled
+                    mc_potential_params_std_dev.Z2 = 0;
+                    break;
+                case 'gaussian':
+                    mc_potential_params_std_dev.A = base_params.A * 0.05;
+                    mc_potential_params_std_dev.alpha = base_params.alpha * 0.05;
+                    break;
+                case 'soft_sphere_repulsive':
+                    mc_potential_params_std_dev.V0_R_product = base_params.V0_R_product * 0.05;
+                    break;
+                case 'finite_square_well':
+                    mc_potential_params_std_dev.V0_well = base_params.V0_well * 0.05;
+                    mc_potential_params_std_dev.a_well = base_params.a_well * 0.02;
+                    break;
+                case 'hydrogen_atom':
+                    // No adjustable parameters to sample
+                    break;
+            }
+
+            console.log("Calculando simulação Monte Carlo...");
+
+            for (let i = 0; i < theta_radians.length; i++) {
+                const theta_rad_i = theta_radians[i];
+                const cross_section_mc_samples = [];
+
+                for (let j = 0; j < n_samples_mc; j++) {
+                    const sampled_params = {};
+
+                    if (potential_type === 'yukawa') {
+                        sampled_params.g = Math.max(0, randomNormal(base_params.g, mc_potential_params_std_dev.g));
+                        sampled_params.mu = Math.max(0, randomNormal(base_params.mu, mc_potential_params_std_dev.mu));
+                    } else if (potential_type === 'rutherford') {
+                        sampled_params.Z1 = base_params.Z1;
+                        sampled_params.Z2 = base_params.Z2;
+                    } else if (potential_type === 'gaussian') {
+                        sampled_params.A = Math.max(0, randomNormal(base_params.A, mc_potential_params_std_dev.A));
+                        sampled_params.alpha = Math.max(0, randomNormal(base_params.alpha, mc_potential_params_std_dev.alpha));
+                    } else if (potential_type === 'soft_sphere_repulsive') {
+                        sampled_params.V0_R_product = Math.max(0, randomNormal(base_params.V0_R_product, mc_potential_params_std_dev.V0_R_product));
+                    } else if (potential_type === 'finite_square_well') {
+                        sampled_params.V0_well = Math.max(0, randomNormal(base_params.V0_well, mc_potential_params_std_dev.V0_well));
+                        sampled_params.a_well = Math.max(0, randomNormal(base_params.a_well, mc_potential_params_std_dev.a_well));
+                    } else if (potential_type === 'hydrogen_atom') {
+                        // Não há parâmetros de potencial para amostrar neste caso
+                    }
+                    
+                    const sample_cross_section = born_differential_cross_section(
+                        theta_rad_i, m, k, potential_type, sampled_params
+                    );
+                    
+                    // Ensure that if sample_cross_section is an array (e.g., from finite_square_well with an array q),
+                    // we take the first (or relevant) element, or ensure V_q_finite_square_well returns a scalar for a scalar q input.
+                    // The born_differential_cross_section should return a scalar for scalar theta_rad_i.
+                    cross_section_mc_samples.push(Array.isArray(sample_cross_section) ? sample_cross_section[0] : sample_cross_section);
+                }
+                
+                const current_mean = calculateMean(cross_section_mc_samples);
+                mean_mc_cross_section_per_angle[i] = current_mean;
+                std_mc_cross_section_per_angle[i] = calculateStdDev(cross_section_mc_samples, current_mean);
+            }
+            console.log("Cálculo Monte Carlo concluído.");
+            return { mean: mean_mc_cross_section_per_angle, stdDev: std_mc_cross_section_per_angle };
+        }
+
+        // --- Função para Atualizar Ambos os Gráficos ---
+        function updateCharts() {
+            const selectedPotential = potentialSelect.value;
+            const particleEnergyEV = parseFloat(particleEnergyInput.value);
+            const thetaMinDeg = parseFloat(thetaMinInput.value);
+            const thetaMaxDeg = parseFloat(thetaMaxInput.value);
+            const numThetaPoints = parseInt(numThetaPointsInput.value);
+            const numMCSamples = parseInt(numMCSamplesInput.value);
+
+            // Validações básicas
+            if (isNaN(particleEnergyEV) || particleEnergyEV <= 0) { alert("Por favor, insira uma energia da partícula válida e positiva."); return; }
+            if (isNaN(thetaMinDeg) || isNaN(thetaMaxDeg) || thetaMinDeg < 0 || thetaMaxDeg > 180 || thetaMinDeg >= thetaMaxDeg) { alert("Por favor, insira um intervalo de ângulos válido (0 <= min < max <= 180)."); return; }
+            if (isNaN(numThetaPoints) || numThetaPoints < 2) { alert("Por favor, insira um número de pontos de ângulo válido (mínimo 2)."); return; }
+            if (isNaN(numMCSamples) || numMCSamples < 10) { alert("Por favor, insira um número de amostras Monte Carlo válido (mínimo 10)."); return; }
+            if (thetaMinDeg === 0 && (selectedPotential === 'rutherford' || selectedPotential === 'soft_sphere_repulsive')) { alert("Ângulo mínimo de 0 graus causa singularidade para os potenciais de Rutherford e Esfera Mole Repulsiva. Por favor, use um valor maior que 0."); return; }
+
+            const E_kin_J = particleEnergyEV * e;
+            const k_val = Math.sqrt(2 * m_e * E_kin_J) / hbar;
+
+            const theta_degrees = [];
+            const theta_radians = [];
+            for (let i = 0; i < numThetaPoints; i++) {
+                const deg = thetaMinDeg + (thetaMaxDeg - thetaMinDeg) * i / (numThetaPoints - 1);
+                theta_degrees.push(deg);
+                theta_radians.push(deg * Math.PI / 180);
+            }
+
+            const potentialParams = {};
+            switch (selectedPotential) {
+                case 'rutherford':
+                    potentialParams.Z1 = parseFloat(document.getElementById('rutherfordZ1').value);
+                    potentialParams.Z2 = parseFloat(document.getElementById('rutherfordZ2').value);
+                    break;
+                case 'yukawa':
+                    potentialParams.g = parseFloat(document.getElementById('yukawaG').value);
+                    potentialParams.mu = parseFloat(document.getElementById('yukawaMu').value);
+                    break;
+                case 'gaussian':
+                    potentialParams.A = parseFloat(document.getElementById('gaussianA').value);
+                    potentialParams.alpha = parseFloat(document.getElementById('gaussianAlpha').value);
+                    break;
+                case 'soft_sphere_repulsive':
+                    potentialParams.V0_R_product = parseFloat(document.getElementById('softSphereV0R').value);
+                    break;
+                case 'finite_square_well':
+                    potentialParams.V0_well = parseFloat(document.getElementById('finiteWellV0').value);
+                    potentialParams.a_well = parseFloat(document.getElementById('finiteWellA').value);
+                    break;
+                case 'hydrogen_atom':
+                    break;
+            }
+
+            // Calcula a seção de choque analítica
+            const crossSectionBornAnalytical = theta_radians.map(angle => 
+                born_differential_cross_section(angle, m_e, k_val, selectedPotential, potentialParams)
+            );
+
+            // Executa a simulação Monte Carlo
+            const mcResults = runMonteCarloSimulation(theta_radians, m_e, k_val, selectedPotential, potentialParams, numMCSamples);
+            const crossSectionMCMean = mcResults.mean;
+            // const crossSectionMCStdDev = mcResults.stdDev; // Desvio padrão calculado, mas não plotado diretamente como barras de erro no Chart.js sem plugin
+
+
+            // Título do potencial para o gráfico
+            let plotTitle = '';
+            switch (selectedPotential) {
+                case 'rutherford': plotTitle = 'Rutherford (Coulomb)'; break;
+                case 'yukawa': plotTitle = 'Yukawa'; break;
+                case 'gaussian': plotTitle = 'Gaussiano'; break;
+                case 'soft_sphere_repulsive': plotTitle = 'Esfera Mole Repulsiva (Tipo 1/r)'; break;
+                case 'finite_square_well': plotTitle = 'Poço Quadrado Finito'; break;
+                case 'hydrogen_atom': plotTitle = 'Átomo de Hidrogênio (Estado Fundamental)'; break;
+            }
+
+            // Atualiza a equação de V(q) exibida
+            VqEquationDisplay.innerHTML = VqEquations[selectedPotential];
+            MathJax.Hub.Queue(["Typeset", MathJax.Hub, VqEquationDisplay]);
+
+
+            // --- Gráfico Analítico ---
+            if (analyticalChart) { analyticalChart.destroy(); }
+            analyticalChart = new Chart(ctxAnalytical, {
+                type: 'line',
+                data: {
+                    labels: theta_degrees.map(deg => deg.toFixed(1)),
+                    datasets: [{
+                        label: `dσ/dΩ Analítico para ${plotTitle} (E=${particleEnergyEV} eV)`,
+                        data: crossSectionBornAnalytical,
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1,
+                        fill: false,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        title: { display: true, text: `Seção de Choque Diferencial Analítica (${plotTitle})`, font: { size: 18 } }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Ângulo de Espalhamento θ (graus)' } },
+                        y: {
+                            type: 'logarithmic',
+                            title: { display: true, text: 'Seção de Choque Diferencial dσ/dΩ (m²/sr)' },
+                            // Add Number.EPSILON to avoid log(0) or log(negative) if data is exactly zero or negative
+                            ticks: { callback: function(value) { return Number(value).toExponential(0); } }
+                        }
+                    }
+                }
+            });
+
+            // --- Gráfico Monte Carlo ---
+            if (mcChart) { mcChart.destroy(); }
+            mcChart = new Chart(ctxMC, {
+                type: 'scatter', // Scatter para pontos, pois a MC é uma amostragem
+                data: {
+                    labels: theta_degrees.map(deg => deg.toFixed(1)),
+                    datasets: [{
+                        label: `dσ/dΩ Média MC para ${plotTitle} (E=${particleEnergyEV} eV)`,
+                        data: crossSectionMCMean.map((val, idx) => ({x: theta_degrees[idx], y: val})),
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        showLine: false, // Não conecta os pontos para representar amostras
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        title: { display: true, text: `Seção de Choque Diferencial Monte Carlo (Média) (${plotTitle})`, font: { size: 18 } }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Ângulo de Espalhamento θ (graus)' } },
+                        y: {
+                            type: 'logarithmic',
+                            title: { display: true, text: 'Seção de Choque Diferencial dσ/dΩ (m²/sr)' },
+                            // Add Number.EPSILON to avoid log(0) or log(negative) if data is exactly zero or negative
+                            ticks: { callback: function(value) { return Number(value).toExponential(0); } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- Função para Alternar a Visibilidade dos Parâmetros do Potencial ---
+        function toggleParamInputs() {
+            const selectedPotential = potentialSelect.value;
+            for (const key in paramGroups) {
+                if (paramGroups.hasOwnProperty(key)) {
+                    paramGroups[key].classList.remove('active');
+                }
+            }
+            if (paramGroups[selectedPotential]) {
+                paramGroups[selectedPotential].classList.add('active');
+            }
+            // No need to call updateCharts here, it's called after toggleParamInputs
+        }
+
+        // --- Event Listeners ---
+        potentialSelect.addEventListener('change', toggleParamInputs);
+        potentialSelect.addEventListener('change', updateCharts); // Call updateCharts on potential change
+        particleEnergyInput.addEventListener('input', updateCharts);
+        thetaMinInput.addEventListener('input', updateCharts);
+        thetaMaxInput.addEventListener('input', updateCharts);
+        numThetaPointsInput.addEventListener('input', updateCharts);
+        numMCSamplesInput.addEventListener('input', updateCharts);
+
+        document.querySelectorAll('.param-inputs input[type="number"]').forEach(input => {
+            input.addEventListener('input', updateCharts);
+        });
+
+        // Inicializa a página
+        toggleParamInputs(); // This will set the correct parameter inputs initially
+        updateCharts();      // This will draw the charts initially
+    </script>
+</body>
+</html>
