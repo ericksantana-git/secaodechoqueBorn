@@ -6,6 +6,7 @@
     <title>Seção de Choque Diferencial (Aproximação de Born) - Comparativo MC</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -83,6 +84,34 @@
             background-color: #e9e9e9;
             border-radius: 8px;
         }
+        .export-button-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .export-button-container button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .export-button-container button:hover {
+            background-color: #45a049;
+        }
+        .plot-type-controls {
+            display: none; /* Hidden by default, managed by JS */
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        .plot-type-controls.active {
+            display: grid;
+        }
     </style>
 </head>
 <body>
@@ -99,24 +128,59 @@
                     <option value="soft_sphere_repulsive">Esfera Mole Repulsiva (Tipo 1/r)</option>
                     <option value="finite_square_well">Poço Quadrado Finito</option>
                     <option value="hydrogen_atom">Átomo de Hidrogênio (Estado Fundamental)</option>
+                    <option value="woods_saxon">Woods-Saxon</option>
+                    <option value="lennard_jones">Lennard-Jones</option>
+                    <option value="morse">Morse</option>
                 </select>
             </div>
             <div class="control-group">
-                <label for="particleEnergy">Energia da Partícula (eV):</label>
-                <input type="number" id="particleEnergy" value="5000" step="100">
+                <label for="plotTypeSelect">Plotar em Função de:</label>
+                <select id="plotTypeSelect">
+                    <option value="angle">Ângulo (θ)</option>
+                    <option value="energy">Energia (E)</option>
+                </select>
             </div>
-            <div class="control-group">
-                <label for="thetaMin">Ângulo Mínimo (°):</label>
-                <input type="number" id="thetaMin" value="0.1" step="0.1" min="0">
+            
+            <div class="control-group" id="particleEnergySingleGroup">
+                <label for="particleEnergySingle">Energia da Partícula (eV):</label>
+                <input type="number" id="particleEnergySingle" value="5000" step="100">
             </div>
-            <div class="control-group">
-                <label for="thetaMax">Ângulo Máximo (°):</label>
-                <input type="number" id="thetaMax" value="25" step="1" max="25">
+
+            <div class="control-group" id="thetaSingleGroup">
+                <label for="thetaSingle">Ângulo (θ em °):</label>
+                <input type="number" id="thetaSingle" value="10" step="0.1" min="0" max="180">
             </div>
-            <div class="control-group">
-                <label for="numThetaPoints">Número de Pontos de Ângulo:</label>
-                <input type="number" id="numThetaPoints" value="500" step="50" min="50">
+
+            <div class="plot-type-controls" id="energyRangeControls">
+                <div class="control-group">
+                    <label for="particleEnergyMin">Energia Mínima (eV):</label>
+                    <input type="number" id="particleEnergyMin" value="100" step="10">
+                </div>
+                <div class="control-group">
+                    <label for="particleEnergyMax">Energia Máxima (eV):</label>
+                    <input type="number" id="particleEnergyMax" value="10000" step="100">
+                </div>
+                <div class="control-group">
+                    <label for="numEnergyPoints">Número de Pontos de Energia:</label>
+                    <input type="number" id="numEnergyPoints" value="50" step="10" min="10">
+                </div>
             </div>
+
+            <div class="plot-type-controls active" id="angleRangeControls">
+                <div class="control-group">
+                    <label for="thetaMin">Ângulo Mínimo (°):</label>
+                    <input type="number" id="thetaMin" value="0.1" step="0.1" min="0">
+                </div>
+                <div class="control-group">
+                    <label for="thetaMax">Ângulo Máximo (°):</label>
+                    <input type="number" id="thetaMax" value="25" step="1" max="180">
+                </div>
+                <div class="control-group">
+                    <label for="numThetaPoints">Número de Pontos de Ângulo:</label>
+                    <input type="number" id="numThetaPoints" value="500" step="50" min="50">
+                </div>
+            </div>
+            
             <div class="control-group">
                 <label for="numMCSamples">Amostras Monte Carlo:</label>
                 <input type="number" id="numMCSamples" value="500" step="100" min="10">
@@ -176,6 +240,47 @@
         <div id="hydrogenAtom-params" class="param-inputs">
             <p>Este potencial usa constantes físicas (carga do elétron, raio de Bohr) e não possui parâmetros ajustáveis diretamente pelo usuário.</p>
         </div>
+
+        <div id="woods_saxon-params" class="param-inputs">
+            <div class="control-group">
+                <label for="woodsSaxonV0">V0 (J):</label>
+                <input type="number" id="woodsSaxonV0" value="-1.6e-11" step="1e-13">
+            </div>
+            <div class="control-group">
+                <label for="woodsSaxonR">Raio R (m):</label>
+                <input type="number" id="woodsSaxonR" value="5e-15" step="1e-16">
+            </div>
+            <div class="control-group">
+                <label for="woodsSaxona">Difusividade a (m):</label>
+                <input type="number" id="woodsSaxona" value="0.5e-15" step="1e-16">
+            </div>
+        </div>
+
+        <div id="lennard_jones-params" class="param-inputs">
+            <div class="control-group">
+                <label for="lennardJonesEpsilon">Epsilon (J):</label>
+                <input type="number" id="lennardJonesEpsilon" value="1.65e-21" step="1e-22">
+            </div>
+            <div class="control-group">
+                <label for="lennardJonesSigma">Sigma (m):</label>
+                <input type="number" id="lennardJonesSigma" value="3.4e-10" step="1e-11">
+            </div>
+        </div>
+
+        <div id="morse-params" class="param-inputs">
+            <div class="control-group">
+                <label for="morseDe">Profundidade De (J):</label>
+                <input type="number" id="morseDe" value="7.61e-19" step="1e-20">
+            </div>
+            <div class="control-group">
+                <label for="morsea">Largura a (m⁻¹):</label>
+                <input type="number" id="morsea" value="1.9e10" step="1e9">
+            </div>
+            <div class="control-group">
+                <label for="morsere">Equilíbrio re (m):</label>
+                <input type="number" id="morsere" value="7.4e-11" step="1e-12">
+            </div>
+        </div>
         
         <div class="equation-display" id="equationDisplay">
             $$ \frac{d\sigma}{d\Omega} = \left(\frac{m}{2\pi\hbar^2}\right)^2 |V(q)|^2 $$
@@ -194,6 +299,10 @@
         <div class="chart-container">
             <canvas id="mcCrossSectionChart"></canvas>
         </div>
+
+        <div class="export-button-container">
+            <button onclick="exportarDados()">Exportar Dados para Excel</button>
+        </div>
     </div>
 
     <script>
@@ -206,12 +315,27 @@
 
         // Referências aos elementos HTML
         const potentialSelect = document.getElementById('potentialSelect');
-        const particleEnergyInput = document.getElementById('particleEnergy');
+        const plotTypeSelect = document.getElementById('plotTypeSelect');
+
+        const particleEnergySingleInput = document.getElementById('particleEnergySingle');
+        const thetaSingleInput = document.getElementById('thetaSingle');
+
+        const particleEnergyMinInput = document.getElementById('particleEnergyMin');
+        const particleEnergyMaxInput = document.getElementById('particleEnergyMax');
+        const numEnergyPointsInput = document.getElementById('numEnergyPoints');
+
         const thetaMinInput = document.getElementById('thetaMin');
         const thetaMaxInput = document.getElementById('thetaMax');
         const numThetaPointsInput = document.getElementById('numThetaPoints');
+        
         const numMCSamplesInput = document.getElementById('numMCSamples');
         
+        const particleEnergySingleGroup = document.getElementById('particleEnergySingleGroup');
+        const thetaSingleGroup = document.getElementById('thetaSingleGroup');
+        const energyRangeControls = document.getElementById('energyRangeControls');
+        const angleRangeControls = document.getElementById('angleRangeControls');
+
+
         const ctxAnalytical = document.getElementById('analyticalCrossSectionChart').getContext('2d');
         const ctxMC = document.getElementById('mcCrossSectionChart').getContext('2d');
         const VqEquationDisplay = document.getElementById('VqEquation');
@@ -223,11 +347,21 @@
             'gaussian': document.getElementById('gaussian-params'),
             'soft_sphere_repulsive': document.getElementById('softSphere-params'),
             'finite_square_well': document.getElementById('finiteSquareWell-params'),
-            'hydrogen_atom': document.getElementById('hydrogenAtom-params')
+            'hydrogen_atom': document.getElementById('hydrogenAtom-params'),
+            'woods_saxon': document.getElementById('woods_saxon-params'),
+            'lennard_jones': document.getElementById('lennard_jones-params'),
+            'morse': document.getElementById('morse-params')
         };
 
         let analyticalChart;
         let mcChart;
+
+        // Variables to store current chart data for export
+        let currentXLabels = []; // Stores either theta or energy values
+        let currentCrossSectionBornAnalytical = [];
+        let currentCrossSectionMCMean = [];
+        let currentPlotType = 'angle'; // Default plot type
+
 
         // --- Funções Auxiliares para Estatística (equivalente a numpy) ---
 
@@ -258,15 +392,34 @@
             return Math.sqrt(calculateMean(sqDiffs));
         }
 
+        // --- Biblioteca de Integração Numérica (Regra de Simpson) ---
+        // A função integra f(x) de a a b usando n segmentos (n deve ser par)
+        function simpsonsRule(f, a, b, n) {
+            if (n % 2 !== 0) {
+                // console.warn("Número de segmentos (n) para a Regra de Simpson deve ser par. Usando n-1.");
+                n -= 1; // Adjust n to be even
+            }
+            if (n === 0) return 0;
+
+            const h = (b - a) / n;
+            let sum = f(a) + f(b);
+
+            for (let i = 1; i < n; i += 2) {
+                sum += 4 * f(a + i * h);
+            }
+            for (let i = 2; i < n - 1; i += 2) {
+                sum += 2 * f(a + i * h);
+            }
+            return (h / 3) * sum;
+        }
+
         // --- Funções para as Transformadas de Fourier dos Potenciais (Portadas do Python) ---
         function V_q_yukawa(q, g, mu) {
-            // Added Math.pow for clarity and consistency
-            return 4 * Math.PI * g / (Math.pow(q, 2) + Math.pow(mu, 2) + Number.EPSILON); // Use Number.EPSILON for small numbers
+            return 4 * Math.PI * g / (Math.pow(q, 2) + Math.pow(mu, 2) + Number.EPSILON);
         }
 
         function V_q_rutherford(q, Z1, Z2) {
-            // Added Math.pow for clarity and consistency
-            return (Z1 * Z2 * Math.pow(e, 2)) / (epsilon_0 * (Math.pow(q, 2) + Number.EPSILON)); // Use Number.EPSILON
+            return (Z1 * Z2 * Math.pow(e, 2)) / (epsilon_0 * (Math.pow(q, 2) + Number.EPSILON));
         }
 
         function V_q_gaussian(q, A, alpha) {
@@ -274,27 +427,126 @@
         }
 
         function V_q_soft_sphere_repulsive(q, V0_R_product) {
-            // Added Math.pow for clarity and consistency
-            return (4 * Math.PI * V0_R_product) / (Math.pow(q, 2) + Number.EPSILON); // Use Number.EPSILON
+            return (4 * Math.PI * V0_R_product) / (Math.pow(q, 2) + Number.EPSILON);
         }
 
         function V_q_finite_square_well(q, V0_well, a_well) {
-            const calculateSingleQ = (qi) => {
-                if (Math.abs(qi) < Number.EPSILON) { // Use Number.EPSILON for comparison with small numbers
-                    return -4 * Math.PI * V0_well * Math.pow(a_well, 3) / 3;
-                } else {
-                    return -4 * Math.PI * V0_well * (Math.sin(qi * a_well) - qi * a_well * Math.cos(qi * a_well)) / (Math.pow(qi, 3) + Number.EPSILON); // Use Number.EPSILON
-                }
-            };
-            return Array.isArray(q) ? q.map(calculateSingleQ) : calculateSingleQ(q);
+            const qa = q * a_well;
+            if (Math.abs(qa) < Number.EPSILON) {
+                return -4 * Math.PI * V0_well * Math.pow(a_well, 3) / 3;
+            } else {
+                return -4 * Math.PI * V0_well * (Math.sin(qa) - qa * Math.cos(qa)) / Math.pow(qa, 3);
+            }
         }
 
         function V_q_hydrogen_atom(q) {
             const qa0_half_squared = Math.pow(q * a0 / 2, 2);
             const F_q = 1.0 / Math.pow(1.0 + qa0_half_squared, 2);
-            // Added Math.pow for clarity and consistency
-            return -(Math.pow(e, 2) / (epsilon_0 * (Math.pow(q, 2) + Number.EPSILON))) * (1.0 - F_q); // Use Number.EPSILON
+            return -(Math.pow(e, 2) / (epsilon_0 * (Math.pow(q, 2) + Number.EPSILON))) * (1.0 - F_q);
         }
+
+        // --- Novas Funções para Potenciais com Integração Numérica ---
+
+        // Woods-Saxon Potential V(r)
+        function V_woods_saxon(r, V0_ws, R_ws, a_ws) {
+            return V0_ws / (1 + Math.exp((r - R_ws) / a_ws));
+        }
+
+        // Fourier Transform for Woods-Saxon (Numerical Integration)
+        function V_q_woods_saxon(q, V0_ws, R_ws, a_ws) {
+            const R_max = R_ws + 15 * a_ws; // Max integration radius
+            const num_segments = 1000; // Number of segments for Simpson's Rule
+
+            // Function to integrate for Fourier Transform
+            const integrand = (r) => {
+                if (q === 0) { // Special case for q = 0, V(q=0) = 4 * pi * Integral[r^2 * V(r)] dr
+                    return Math.pow(r, 2) * V_woods_saxon(r, V0_ws, R_ws, a_ws);
+                } else {
+                    return Math.pow(r, 2) * V_woods_saxon(r, V0_ws, R_ws, a_ws) * Math.sin(q * r) / (q * r);
+                }
+            };
+
+            const integral_result = simpsonsRule(integrand, 0, R_max, num_segments);
+            return 4 * Math.PI * integral_result;
+        }
+
+        // Lennard-Jones Potential V(r)
+        function V_lennard_jones(r, epsilon_lj, sigma_lj) {
+            // Avoid division by zero, return a large number or handle as appropriate for very small r
+            if (r === 0) return Infinity; 
+            const r_over_sigma = sigma_lj / r;
+            return 4 * epsilon_lj * (Math.pow(r_over_sigma, 12) - Math.pow(r_over_sigma, 6));
+        }
+
+        // Fourier Transform for Lennard-Jones (Numerical Integration)
+        function V_q_lennard_jones(q, epsilon_lj, sigma_lj) {
+            // For LJ, integral can diverge or be sensitive at low r. Start integration slightly above 0.
+            const r_min_integration = sigma_lj / 100; // Avoid r=0
+            const R_max_integration = sigma_lj * 10; // Integration up to 10*sigma, where potential is very small
+            const num_segments = 1000;
+
+            const integrand = (r) => {
+                if (r < Number.EPSILON) return 0; // Avoid issues if r is extremely small
+                if (q === 0) {
+                    return Math.pow(r, 2) * V_lennard_jones(r, epsilon_lj, sigma_lj);
+                } else {
+                    return Math.pow(r, 2) * V_lennard_jones(r, epsilon_lj, sigma_lj) * Math.sin(q * r) / (q * r);
+                }
+            };
+
+            try {
+                // Ensure r_min_integration is less than R_max_integration
+                if (r_min_integration >= R_max_integration) {
+                    // console.warn("r_min_integration >= R_max_integration for Lennard-Jones, returning 0.");
+                    return 0;
+                }
+                const integral_result = simpsonsRule(integrand, r_min_integration, R_max_integration, num_segments);
+                return 4 * Math.PI * integral_result;
+            } catch (error) {
+                console.error("Erro no cálculo da transformada de Fourier de Lennard-Jones:", error);
+                return NaN; // Return NaN to indicate a problem
+            }
+        }
+
+        // Morse Potential V(r)
+        function V_morse(r, De_m, a_m, re_m) {
+            const exp_term = Math.exp(-a_m * (r - re_m));
+            return De_m * Math.pow(1 - exp_term, 2);
+        }
+
+        // Fourier Transform for Morse Potential (Numerical Integration)
+        function V_q_morse(q, De_m, a_m, re_m) {
+            // Determine suitable integration range.
+            // Morse potential drops off exponentially. Let's integrate over a few r_e distances.
+            // Start from near 0 (or a small positive value to avoid issues if re_m is very small)
+            // Go up to a point where potential is negligible, e.g., re_m + 5 * (1/a_m)
+            const r_min_integration = Math.max(0, re_m - 3 / a_m); // Start slightly before minimum
+            const R_max_integration = re_m + 10 / a_m; // Integrate out to where it's negligible
+            const num_segments = 1000;
+
+            const integrand = (r) => {
+                if (r < Number.EPSILON) return 0; // Avoid issues if r is extremely small
+                if (q === 0) { // Special case for q = 0
+                    return Math.pow(r, 2) * V_morse(r, De_m, a_m, re_m);
+                } else {
+                    return Math.pow(r, 2) * V_morse(r, De_m, a_m, re_m) * Math.sin(q * r) / (q * r);
+                }
+            };
+            
+            try {
+                // Ensure r_min_integration is less than R_max_integration
+                if (r_min_integration >= R_max_integration) {
+                    // console.warn("r_min_integration >= R_max_integration for Morse, returning 0.");
+                    return 0;
+                }
+                const integral_result = simpsonsRule(integrand, r_min_integration, R_max_integration, num_segments);
+                return 4 * Math.PI * integral_result;
+            } catch (error) {
+                console.error("Erro no cálculo da transformada de Fourier de Morse:", error);
+                return NaN;
+            }
+        }
+
 
         // Equações LaTeX para V(q) para exibição
         const VqEquations = {
@@ -303,12 +555,97 @@
             'gaussian': `$$ V(q) = A \\left(\\frac{\\pi}{\\alpha}\\right)^{3/2} e^{-q^2 / (4\\alpha)} $$`,
             'soft_sphere_repulsive': `$$ V(q) = \\frac{4 \\pi (V_0 R)}{q^2} \\quad \\text{(onde } V_0 R \\text{ é o produto passado)} $$`,
             'finite_square_well': `$$ V(q) = -\\frac{4 \\pi V_0 a^3}{3} \\frac{3}{ (qa)^3 } (\\sin(qa) - qa \\cos(qa)) $$`,
-            'hydrogen_atom': `$$ V(q) = -\\frac{e^2}{\\epsilon_0 q^2} \\left(1 - \\frac{1}{(1 + (qa_0/2)^2)^2}\\right) $$`
+            'hydrogen_atom': `$$ V(q) = -\\frac{e^2}{\\epsilon_0 q^2} \\left(1 - \\frac{1}{(1 + (qa_0/2)^2)^2}\\right) $$`,
+            'woods_saxon': `$$ V(q) = 4 \\pi \\int_0^{\\infty} r^2 \\frac{V_0}{1 + e^{(r-R)/a}} \\frac{\\sin(qr)}{qr} dr $$`,
+            'lennard_jones': `$$ V(q) = 4 \\pi \\int_0^{\\infty} r^2 \\left( 4\\epsilon \\left[ \\left(\\frac{\\sigma}{r}\\right)^{12} - \\left(\\frac{\\sigma}{r}\\right)^{6} \\right] \\right) \\frac{\\sin(qr)}{qr} dr $$`,
+            'morse': `$$ V(q) = 4 \\pi \\int_0^{\\infty} r^2 D_e(1 - e^{-a(r-r_e)})^2 \\frac{\\sin(qr)}{qr} dr $$`
         };
 
+        // --- Valores de parâmetros default para cada potencial para autoajuste ---
+        const potentialDefaultParams = {
+            'rutherford': {
+                particleEnergy: 5000, // eV, para colisões em nível atômico
+                thetaMin: 0.1, // Rutherford diverge em 0
+                thetaMax: 25,
+                thetaSingle: 10,
+                particleEnergyMin: 100,
+                particleEnergyMax: 10000
+            },
+            'yukawa': {
+                particleEnergy: 1000, // eV, interações de curto alcance
+                thetaMin: 0.05,
+                thetaMax: 60,
+                thetaSingle: 10,
+                particleEnergyMin: 10,
+                particleEnergyMax: 5000
+            },
+            'gaussian': {
+                particleEnergy: 500, // eV, interações suaves, curto alcance
+                thetaMin: 0.01,
+                thetaMax: 90,
+                thetaSingle: 10,
+                particleEnergyMin: 10,
+                particleEnergyMax: 2000
+            },
+            'soft_sphere_repulsive': {
+                particleEnergy: 2000, // eV, similar ao Rutherford, mas com V0R
+                thetaMin: 0.1, // Diverge em 0
+                thetaMax: 30,
+                thetaSingle: 10,
+                particleEnergyMin: 50,
+                particleEnergyMax: 8000
+            },
+            'finite_square_well': {
+                particleEnergy: 5000, // eV, energias mais baixas para ver efeitos de poço
+                thetaMin: 0.1,
+                thetaMax: 25, // Pode mostrar mais estrutura em ângulos maiores
+                thetaSingle: 10,
+                particleEnergyMin: 100,
+                particleEnergyMax: 10000
+            },
+            'hydrogen_atom': {
+                particleEnergy: 100, // eV, para ver o efeito de blindagem
+                thetaMin: 0.01,
+                thetaMax: 90,
+                thetaSingle: 10,
+                particleEnergyMin: 1,
+                particleEnergyMax: 500
+            },
+            'woods_saxon': {
+                particleEnergy: 50e6, // eV (50 MeV), típico para física nuclear
+                thetaMin: 0.01,
+                thetaMax: 45,
+                thetaSingle: 10,
+                particleEnergyMin: 1e6,
+                particleEnergyMax: 100e6
+            },
+            'lennard_jones': {
+                particleEnergy: 0.1, // eV (100 meV), típico para interações moleculares de baixa energia
+                thetaMin: 0.01,
+                thetaMax: 180,
+                thetaSingle: 90,
+                particleEnergyMin: 0.001,
+                particleEnergyMax: 1
+            },
+            'morse': {
+                particleEnergy: 5, // eV (50 meV), típico para interações moleculares
+                thetaMin: 0.01,
+                thetaMax: 180,
+                thetaSingle: 90,
+                particleEnergyMin: 0.1,
+                particleEnergyMax: 20
+            }
+        };
+
+
         // --- Função Principal para Calcular a Seção de Choque Diferencial (Analítica) ---
-        function born_differential_cross_section(theta_rad, m, k, potential_type, params) {
+        function born_differential_cross_section(theta_rad, E_kin_J, potential_type, params) {
+            const k = Math.sqrt(2 * m_e * E_kin_J) / hbar;
             const sin_theta_half = Math.sin(theta_rad / 2);
+            // q should be strictly positive for most V(q) forms involving 1/q^2.
+            // When theta_rad is very small, q can be very small.
+            // If theta_rad is exactly 0, q is 0, which needs careful handling for 1/q^2 cases.
+            // The EPSILON in V_q functions helps, but it's good to ensure q is not negative or undefined.
             const q = 2 * k * sin_theta_half;
 
             let V_q_result;
@@ -319,122 +656,206 @@
                 case 'soft_sphere_repulsive': V_q_result = V_q_soft_sphere_repulsive(q, params.V0_R_product); break;
                 case 'finite_square_well': V_q_result = V_q_finite_square_well(q, params.V0_well, params.a_well); break;
                 case 'hydrogen_atom': V_q_result = V_q_hydrogen_atom(q); break;
+                case 'woods_saxon': V_q_result = V_q_woods_saxon(q, params.V0_ws, params.R_ws, params.a_ws); break;
+                case 'lennard_jones': V_q_result = V_q_lennard_jones(q, params.epsilon_lj, params.sigma_lj); break;
+                case 'morse': V_q_result = V_q_morse(q, params.De_m, params.a_m, params.re_m); break;
                 default: console.error("Tipo de potencial não suportado."); return 0;
             }
             
-            // Ensure V_q_abs_squared is handled correctly for both scalar and array results
-            let V_q_abs_squared = Array.isArray(V_q_result) ? V_q_result.map(val => Math.pow(Math.abs(val), 2)) : Math.pow(Math.abs(V_q_result), 2);
+            let V_q_abs_squared = Math.pow(Math.abs(V_q_result), 2);
 
-            const constant_factor = Math.pow(m / (2 * Math.PI * hbar * hbar), 2); // Corrected hbar squared to hbar * hbar or Math.pow(hbar, 2)
+            const constant_factor = Math.pow(m_e / (2 * Math.PI * hbar * hbar), 2);
             
-            // Ensure the return is an array if V_q_abs_squared is an array
-            return Array.isArray(V_q_abs_squared) ? V_q_abs_squared.map(val => constant_factor * val) : constant_factor * V_q_abs_squared;
+            return constant_factor * V_q_abs_squared;
         }
 
         // --- Função para Executar a Simulação Monte Carlo ---
-        function runMonteCarloSimulation(theta_radians, m, k, potential_type, base_params, n_samples_mc) {
-            const mean_mc_cross_section_per_angle = new Array(theta_radians.length).fill(0);
-            const std_mc_cross_section_per_angle = new Array(theta_radians.length).fill(0);
+        function runMonteCarloSimulation(x_values, varying_param_type, fixed_param_value, potential_type, base_params, n_samples_mc) {
+            const mean_mc_cross_section_per_point = new Array(x_values.length).fill(0);
+            const std_mc_cross_section_per_point = new Array(x_values.length).fill(0);
 
             // Definir incertezas (desvio padrão) para os parâmetros do potencial
             const mc_potential_params_std_dev = {};
 
+            // Default small uncertainties for parameters that are usually well-defined
+            const default_small_std_dev_factor = 0.01; // 1% uncertainty
+            const default_medium_std_dev_factor = 0.05; // 5% uncertainty
+
             switch (potential_type) {
                 case 'yukawa':
-                    mc_potential_params_std_dev.g = base_params.g * 0.02;
-                    mc_potential_params_std_dev.mu = base_params.mu * 0.02;
+                    mc_potential_params_std_dev.g = base_params.g * default_medium_std_dev_factor;
+                    mc_potential_params_std_dev.mu = base_params.mu * default_medium_std_dev_factor;
                     break;
                 case 'rutherford':
                     mc_potential_params_std_dev.Z1 = 0; // Z1 and Z2 are typically integers and not sampled
                     mc_potential_params_std_dev.Z2 = 0;
                     break;
                 case 'gaussian':
-                    mc_potential_params_std_dev.A = base_params.A * 0.05;
-                    mc_potential_params_std_dev.alpha = base_params.alpha * 0.05;
+                    mc_potential_params_std_dev.A = base_params.A * default_medium_std_dev_factor;
+                    mc_potential_params_std_dev.alpha = base_params.alpha * default_medium_std_dev_factor;
                     break;
                 case 'soft_sphere_repulsive':
-                    mc_potential_params_std_dev.V0_R_product = base_params.V0_R_product * 0.05;
+                    mc_potential_params_std_dev.V0_R_product = base_params.V0_R_product * default_medium_std_dev_factor;
                     break;
                 case 'finite_square_well':
-                    mc_potential_params_std_dev.V0_well = base_params.V0_well * 0.05;
-                    mc_potential_params_std_dev.a_well = base_params.a_well * 0.02;
+                    mc_potential_params_std_dev.V0_well = base_params.V0_well * default_medium_std_dev_factor;
+                    mc_potential_params_std_dev.a_well = Math.max(Number.EPSILON, base_params.a_well * default_small_std_dev_factor); // Ensure a_well > 0
                     break;
                 case 'hydrogen_atom':
                     // No adjustable parameters to sample
                     break;
+                case 'woods_saxon':
+                    mc_potential_params_std_dev.V0_ws = base_params.V0_ws * default_medium_std_dev_factor;
+                    mc_potential_params_std_dev.R_ws = Math.max(Number.EPSILON, randomNormal(base_params.R_ws, base_params.R_ws * default_small_std_dev_factor)); // Sample R_ws
+                    mc_potential_params_std_dev.a_ws = Math.max(Number.EPSILON, randomNormal(base_params.a_ws, base_params.a_ws * default_small_std_dev_factor)); // Sample a_ws
+                    break;
+                case 'lennard_jones':
+                    mc_potential_params_std_dev.epsilon_lj = base_params.epsilon_lj * default_medium_std_dev_factor;
+                    mc_potential_params_std_dev.sigma_lj = Math.max(Number.EPSILON, base_params.sigma_lj * default_small_std_dev_factor); // Ensure sigma_lj > 0
+                    break;
+                case 'morse':
+                    mc_potential_params_std_dev.De_m = base_params.De_m * default_medium_std_dev_factor;
+                    mc_potential_params_std_dev.a_m = Math.max(Number.EPSILON, randomNormal(base_params.a_m, base_params.a_m * default_small_std_dev_factor));
+                    mc_potential_params_std_dev.re_m = Math.max(Number.EPSILON, randomNormal(base_params.re_m, base_params.re_m * default_small_std_dev_factor));
+                    break;
             }
 
-            console.log("Calculando simulação Monte Carlo...");
+            // console.log("Calculando simulação Monte Carlo...");
 
-            for (let i = 0; i < theta_radians.length; i++) {
-                const theta_rad_i = theta_radians[i];
+            for (let i = 0; i < x_values.length; i++) {
+                const current_x_value = x_values[i];
                 const cross_section_mc_samples = [];
 
                 for (let j = 0; j < n_samples_mc; j++) {
                     const sampled_params = {};
 
-                    if (potential_type === 'yukawa') {
-                        sampled_params.g = Math.max(0, randomNormal(base_params.g, mc_potential_params_std_dev.g));
-                        sampled_params.mu = Math.max(0, randomNormal(base_params.mu, mc_potential_params_std_dev.mu));
-                    } else if (potential_type === 'rutherford') {
-                        sampled_params.Z1 = base_params.Z1;
-                        sampled_params.Z2 = base_params.Z2;
-                    } else if (potential_type === 'gaussian') {
-                        sampled_params.A = Math.max(0, randomNormal(base_params.A, mc_potential_params_std_dev.A));
-                        sampled_params.alpha = Math.max(0, randomNormal(base_params.alpha, mc_potential_params_std_dev.alpha));
-                    } else if (potential_type === 'soft_sphere_repulsive') {
-                        sampled_params.V0_R_product = Math.max(0, randomNormal(base_params.V0_R_product, mc_potential_params_std_dev.V0_R_product));
-                    } else if (potential_type === 'finite_square_well') {
-                        sampled_params.V0_well = Math.max(0, randomNormal(base_params.V0_well, mc_potential_params_std_dev.V0_well));
-                        sampled_params.a_well = Math.max(0, randomNormal(base_params.a_well, mc_potential_params_std_dev.a_well));
-                    } else if (potential_type === 'hydrogen_atom') {
-                        // Não há parâmetros de potencial para amostrar neste caso
+                    // Sample parameters based on potential type
+                    switch (potential_type) {
+                        case 'yukawa':
+                            sampled_params.g = Math.max(0, randomNormal(base_params.g, mc_potential_params_std_dev.g));
+                            sampled_params.mu = Math.max(0, randomNormal(base_params.mu, mc_potential_params_std_dev.mu));
+                            break;
+                        case 'rutherford':
+                            sampled_params.Z1 = base_params.Z1;
+                            sampled_params.Z2 = base_params.Z2;
+                            break;
+                        case 'gaussian':
+                            sampled_params.A = Math.max(0, randomNormal(base_params.A, mc_potential_params_std_dev.A));
+                            sampled_params.alpha = Math.max(0, randomNormal(base_params.alpha, mc_potential_params_std_dev.alpha));
+                            break;
+                        case 'soft_sphere_repulsive':
+                            sampled_params.V0_R_product = Math.max(0, randomNormal(base_params.V0_R_product, mc_potential_params_std_dev.V0_R_product));
+                            break;
+                        case 'finite_square_well':
+                            sampled_params.V0_well = Math.max(0, randomNormal(base_params.V0_well, mc_potential_params_std_dev.V0_well));
+                            sampled_params.a_well = Math.max(Number.EPSILON, randomNormal(base_params.a_well, mc_potential_params_std_dev.a_well)); // Ensure a_well > 0
+                            break;
+                        case 'hydrogen_atom':
+                            // No adjustable parameters to sample
+                            break;
+                        case 'woods_saxon':
+                            sampled_params.V0_ws = randomNormal(base_params.V0_ws, mc_potential_params_std_dev.V0_ws);
+                            sampled_params.R_ws = Math.max(Number.EPSILON, randomNormal(base_params.R_ws, mc_potential_params_std_dev.R_ws)); // Ensure R_ws > 0
+                            sampled_params.a_ws = Math.max(Number.EPSILON, randomNormal(base_params.a_ws, mc_potential_params_std_dev.a_ws)); // Ensure a_ws > 0
+                            break;
+                        case 'lennard_jones':
+                            sampled_params.epsilon_lj = Math.max(0, randomNormal(base_params.epsilon_lj, mc_potential_params_std_dev.epsilon_lj));
+                            sampled_params.sigma_lj = Math.max(Number.EPSILON, randomNormal(base_params.sigma_lj, mc_potential_params_std_dev.sigma_lj)); // Ensure sigma_lj > 0
+                            break;
+                        case 'morse':
+                            sampled_params.De_m = Math.max(0, randomNormal(base_params.De_m, mc_potential_params_std_dev.De_m));
+                            sampled_params.a_m = Math.max(Number.EPSILON, randomNormal(base_params.a_m, mc_potential_params_std_dev.a_m));
+                            sampled_params.re_m = Math.max(Number.EPSILON, randomNormal(base_params.re_m, mc_potential_params_std_dev.re_m));
+                            break;
                     }
                     
-                    const sample_cross_section = born_differential_cross_section(
-                        theta_rad_i, m, k, potential_type, sampled_params
-                    );
+                    let sample_cross_section;
+                    if (varying_param_type === 'angle') {
+                        sample_cross_section = born_differential_cross_section(
+                            current_x_value * Math.PI / 180, // Angle in radians
+                            fixed_param_value * e, // Energy in Joules
+                            potential_type,
+                            sampled_params
+                        );
+                    } else { // varying_param_type === 'energy'
+                        sample_cross_section = born_differential_cross_section(
+                            fixed_param_value * Math.PI / 180, // Angle in radians
+                            current_x_value * e, // Energy in Joules
+                            potential_type,
+                            sampled_params
+                        );
+                    }
                     
-                    // Ensure that if sample_cross_section is an array (e.g., from finite_square_well with an array q),
-                    // we take the first (or relevant) element, or ensure V_q_finite_square_well returns a scalar for a scalar q input.
-                    // The born_differential_cross_section should return a scalar for scalar theta_rad_i.
-                    cross_section_mc_samples.push(Array.isArray(sample_cross_section) ? sample_cross_section[0] : sample_cross_section);
+                    if (!isNaN(sample_cross_section) && isFinite(sample_cross_section)) {
+                        cross_section_mc_samples.push(sample_cross_section);
+                    } else {
+                        // console.warn("NaN or Infinity encountered in MC sample, skipping.");
+                    }
                 }
                 
-                const current_mean = calculateMean(cross_section_mc_samples);
-                mean_mc_cross_section_per_angle[i] = current_mean;
-                std_mc_cross_section_per_angle[i] = calculateStdDev(cross_section_mc_samples, current_mean);
+                if (cross_section_mc_samples.length > 0) {
+                    const current_mean = calculateMean(cross_section_mc_samples);
+                    mean_mc_cross_section_per_point[i] = current_mean;
+                    std_mc_cross_section_per_point[i] = calculateStdDev(cross_section_mc_samples, current_mean);
+                } else {
+                    mean_mc_cross_section_per_point[i] = NaN; // No valid samples
+                    std_mc_cross_section_per_point[i] = NaN;
+                }
             }
-            console.log("Cálculo Monte Carlo concluído.");
-            return { mean: mean_mc_cross_section_per_angle, stdDev: std_mc_cross_section_per_angle };
+            // console.log("Cálculo Monte Carlo concluído.");
+            return { mean: mean_mc_cross_section_per_point, stdDev: std_mc_cross_section_per_point };
         }
 
         // --- Função para Atualizar Ambos os Gráficos ---
         function updateCharts() {
             const selectedPotential = potentialSelect.value;
-            const particleEnergyEV = parseFloat(particleEnergyInput.value);
-            const thetaMinDeg = parseFloat(thetaMinInput.value);
-            const thetaMaxDeg = parseFloat(thetaMaxInput.value);
-            const numThetaPoints = parseInt(numThetaPointsInput.value);
+            currentPlotType = plotTypeSelect.value; // Update the global plot type
+
+            // Get common parameters
             const numMCSamples = parseInt(numMCSamplesInput.value);
 
-            // Validações básicas
-            if (isNaN(particleEnergyEV) || particleEnergyEV <= 0) { alert("Por favor, insira uma energia da partícula válida e positiva."); return; }
-            if (isNaN(thetaMinDeg) || isNaN(thetaMaxDeg) || thetaMinDeg < 0 || thetaMaxDeg > 180 || thetaMinDeg >= thetaMaxDeg) { alert("Por favor, insira um intervalo de ângulos válido (0 <= min < max <= 180)."); return; }
-            if (isNaN(numThetaPoints) || numThetaPoints < 2) { alert("Por favor, insira um número de pontos de ângulo válido (mínimo 2)."); return; }
-            if (isNaN(numMCSamples) || numMCSamples < 10) { alert("Por favor, insira um número de amostras Monte Carlo válido (mínimo 10)."); return; }
-            if (thetaMinDeg === 0 && (selectedPotential === 'rutherford' || selectedPotential === 'soft_sphere_repulsive')) { alert("Ângulo mínimo de 0 graus causa singularidade para os potenciais de Rutherford e Esfera Mole Repulsiva. Por favor, use um valor maior que 0."); return; }
+            let fixedParamValue, varyingParamMin, varyingParamMax, numVaryingPoints, xAxisLabel, chartTitleSuffix;
+            let varyingParamValues = []; // This will hold either angles or energies
 
-            const E_kin_J = particleEnergyEV * e;
-            const k_val = Math.sqrt(2 * m_e * E_kin_J) / hbar;
+            if (currentPlotType === 'angle') {
+                fixedParamValue = parseFloat(particleEnergySingleInput.value);
+                varyingParamMin = parseFloat(thetaMinInput.value);
+                varyingParamMax = parseFloat(thetaMaxInput.value);
+                numVaryingPoints = parseInt(numThetaPointsInput.value);
+                xAxisLabel = 'Ângulo de Espalhamento θ (graus)';
+                chartTitleSuffix = `(E=${fixedParamValue} eV)`;
 
-            const theta_degrees = [];
-            const theta_radians = [];
-            for (let i = 0; i < numThetaPoints; i++) {
-                const deg = thetaMinDeg + (thetaMaxDeg - thetaMinDeg) * i / (numThetaPoints - 1);
-                theta_degrees.push(deg);
-                theta_radians.push(deg * Math.PI / 180);
+                // Basic validations for angle plot
+                if (isNaN(fixedParamValue) || fixedParamValue <= 0) { console.error("Por favor, insira uma energia da partícula válida e positiva."); return; }
+                if (isNaN(varyingParamMin) || isNaN(varyingParamMax) || varyingParamMin < 0 || varyingParamMax > 180 || varyingParamMin >= varyingParamMax) { console.error("Por favor, insira um intervalo de ângulos válido (0 <= min < max <= 180)."); return; }
+                if (isNaN(numVaryingPoints) || numVaryingPoints < 2) { console.error("Por favor, insira um número de pontos de ângulo válido (mínimo 2)."); return; }
+                if (varyingParamMin === 0 && (selectedPotential === 'rutherford' || selectedPotential === 'soft_sphere_repulsive')) { console.warn("Ângulo mínimo de 0 graus causa singularidade para os potenciais de Rutherford e Esfera Mole Repulsiva. Ajuste para um valor > 0."); return; }
+
+                for (let i = 0; i < numVaryingPoints; i++) {
+                    varyingParamValues.push(varyingParamMin + (varyingParamMax - varyingParamMin) * i / (numVaryingPoints - 1));
+                }
+
+            } else { // currentPlotType === 'energy'
+                fixedParamValue = parseFloat(thetaSingleInput.value);
+                varyingParamMin = parseFloat(particleEnergyMinInput.value);
+                varyingParamMax = parseFloat(particleEnergyMaxInput.value);
+                numVaryingPoints = parseInt(numEnergyPointsInput.value);
+                xAxisLabel = 'Energia da Partícula (eV)';
+                chartTitleSuffix = `(θ=${fixedParamValue} °)`;
+
+                // Basic validations for energy plot
+                if (isNaN(fixedParamValue) || fixedParamValue < 0 || fixedParamValue > 180) { console.error("Por favor, insira um ângulo válido (0-180°)."); return; }
+                if (isNaN(varyingParamMin) || isNaN(varyingParamMax) || varyingParamMin <= 0 || varyingParamMax <= varyingParamMin) { console.error("Por favor, insira um intervalo de energia válido e positivo."); return; }
+                if (isNaN(numVaryingPoints) || numVaryingPoints < 2) { console.error("Por favor, insira um número de pontos de energia válido (mínimo 2)."); return; }
+                if (fixedParamValue === 0 && (selectedPotential === 'rutherford' || selectedPotential === 'soft_sphere_repulsive')) { console.warn("Ângulo de 0 graus causa singularidade para os potenciais de Rutherford e Esfera Mole Repulsiva. Ajuste para um valor > 0."); return; }
+
+                for (let i = 0; i < numVaryingPoints; i++) {
+                    varyingParamValues.push(varyingParamMin + (varyingParamMax - varyingParamMin) * i / (numVaryingPoints - 1));
+                }
             }
+
+            if (isNaN(numMCSamples) || numMCSamples < 10) { console.error("Por favor, insira um número de amostras Monte Carlo válido (mínimo 10)."); return; }
+
 
             const potentialParams = {};
             switch (selectedPotential) {
@@ -459,17 +880,58 @@
                     break;
                 case 'hydrogen_atom':
                     break;
+                case 'woods_saxon':
+                    potentialParams.V0_ws = parseFloat(document.getElementById('woodsSaxonV0').value);
+                    potentialParams.R_ws = parseFloat(document.getElementById('woodsSaxonR').value);
+                    potentialParams.a_ws = parseFloat(document.getElementById('woodsSaxona').value);
+                    break;
+                case 'lennard_jones':
+                    potentialParams.epsilon_lj = parseFloat(document.getElementById('lennardJonesEpsilon').value);
+                    potentialParams.sigma_lj = parseFloat(document.getElementById('lennardJonesSigma').value);
+                    break;
+                case 'morse':
+                    potentialParams.De_m = parseFloat(document.getElementById('morseDe').value);
+                    potentialParams.a_m = parseFloat(document.getElementById('morsea').value);
+                    potentialParams.re_m = parseFloat(document.getElementById('morsere').value);
+                    break;
             }
 
-            // Calcula a seção de choque analítica
-            const crossSectionBornAnalytical = theta_radians.map(angle => 
-                born_differential_cross_section(angle, m_e, k_val, selectedPotential, potentialParams)
-            );
+            currentXLabels = varyingParamValues; // Store for export
 
-            // Executa a simulação Monte Carlo
-            const mcResults = runMonteCarloSimulation(theta_radians, m_e, k_val, selectedPotential, potentialParams, numMCSamples);
-            const crossSectionMCMean = mcResults.mean;
-            // const crossSectionMCStdDev = mcResults.stdDev; // Desvio padrão calculado, mas não plotado diretamente como barras de erro no Chart.js sem plugin
+            // Calculate analytical and MC cross sections
+            currentCrossSectionBornAnalytical = varyingParamValues.map(val => {
+                let cross_section;
+                if (currentPlotType === 'angle') {
+                    cross_section = born_differential_cross_section(val * Math.PI / 180, fixedParamValue * e, selectedPotential, potentialParams);
+                } else { // energy
+                    cross_section = born_differential_cross_section(fixedParamValue * Math.PI / 180, val * e, selectedPotential, potentialParams);
+                }
+                return isNaN(cross_section) || !isFinite(cross_section) ? 0 : cross_section;
+            });
+
+            const mcResults = runMonteCarloSimulation(varyingParamValues, currentPlotType, fixedParamValue, selectedPotential, potentialParams, numMCSamples);
+            currentCrossSectionMCMean = mcResults.mean.map(val => isNaN(val) || !isFinite(val) ? 0 : val);
+
+
+            // --- Calcular min/max para o eixo Y dinamicamente ---
+            // Combine todos os dados relevantes para encontrar o min e max global
+            const all_data_values = [...currentCrossSectionBornAnalytical, ...currentCrossSectionMCMean].filter(val => val > 0);
+            
+            let yMin = 1e-50; // Um valor mínimo default muito pequeno para evitar log(0)
+            let yMax = 1;
+
+            if (all_data_values.length > 0) {
+                const min_val = Math.min(...all_data_values);
+                const max_val = Math.max(...all_data_values);
+
+                if (min_val > 0) {
+                    yMin = Math.pow(10, Math.floor(Math.log10(min_val * 0.1))); // Um pouco abaixo do menor valor
+                } else {
+                    yMin = 1e-50; // Fallback se o min_val for 0 ou negativo (não deveria ocorrer com o filtro)
+                }
+                yMax = Math.pow(10, Math.ceil(Math.log10(max_val * 10))); // Um pouco acima do maior valor
+            }
+            // console.log(`Y-axis calculated: min=${yMin}, max=${yMax}`);
 
 
             // Título do potencial para o gráfico
@@ -481,6 +943,9 @@
                 case 'soft_sphere_repulsive': plotTitle = 'Esfera Mole Repulsiva (Tipo 1/r)'; break;
                 case 'finite_square_well': plotTitle = 'Poço Quadrado Finito'; break;
                 case 'hydrogen_atom': plotTitle = 'Átomo de Hidrogênio (Estado Fundamental)'; break;
+                case 'woods_saxon': plotTitle = 'Woods-Saxon'; break;
+                case 'lennard_jones': plotTitle = 'Lennard-Jones'; break;
+                case 'morse': plotTitle = 'Morse'; break;
             }
 
             // Atualiza a equação de V(q) exibida
@@ -493,10 +958,10 @@
             analyticalChart = new Chart(ctxAnalytical, {
                 type: 'line',
                 data: {
-                    labels: theta_degrees.map(deg => deg.toFixed(1)),
+                    labels: currentXLabels.map(val => val.toFixed(currentPlotType === 'angle' ? 1 : 2)),
                     datasets: [{
-                        label: `dσ/dΩ Analítico para ${plotTitle} (E=${particleEnergyEV} eV)`,
-                        data: crossSectionBornAnalytical,
+                        label: `dσ/dΩ Analítico para ${plotTitle} ${chartTitleSuffix}`,
+                        data: currentCrossSectionBornAnalytical,
                         borderColor: 'rgb(75, 192, 192)',
                         tension: 0.1,
                         fill: false,
@@ -509,11 +974,12 @@
                         title: { display: true, text: `Seção de Choque Diferencial Analítica (${plotTitle})`, font: { size: 18 } }
                     },
                     scales: {
-                        x: { title: { display: true, text: 'Ângulo de Espalhamento θ (graus)' } },
+                        x: { title: { display: true, text: xAxisLabel } },
                         y: {
                             type: 'logarithmic',
                             title: { display: true, text: 'Seção de Choque Diferencial dσ/dΩ (m²/sr)' },
-                            // Add Number.EPSILON to avoid log(0) or log(negative) if data is exactly zero or negative
+                            min: yMin, // Usar o min calculado dinamicamente
+                            max: yMax, // Usar o max calculado dinamicamente
                             ticks: { callback: function(value) { return Number(value).toExponential(0); } }
                         }
                     }
@@ -525,10 +991,10 @@
             mcChart = new Chart(ctxMC, {
                 type: 'scatter', // Scatter para pontos, pois a MC é uma amostragem
                 data: {
-                    labels: theta_degrees.map(deg => deg.toFixed(1)),
+                    labels: currentXLabels.map(val => val.toFixed(currentPlotType === 'angle' ? 1 : 2)),
                     datasets: [{
-                        label: `dσ/dΩ Média MC para ${plotTitle} (E=${particleEnergyEV} eV)`,
-                        data: crossSectionMCMean.map((val, idx) => ({x: theta_degrees[idx], y: val})),
+                        label: `dσ/dΩ Média MC para ${plotTitle} ${chartTitleSuffix}`,
+                        data: currentCrossSectionMCMean.map((val, idx) => ({x: currentXLabels[idx], y: val})),
                         borderColor: 'rgb(255, 99, 132)',
                         backgroundColor: 'rgba(255, 99, 132, 0.6)',
                         pointRadius: 3,
@@ -542,11 +1008,12 @@
                         title: { display: true, text: `Seção de Choque Diferencial Monte Carlo (Média) (${plotTitle})`, font: { size: 18 } }
                     },
                     scales: {
-                        x: { title: { display: true, text: 'Ângulo de Espalhamento θ (graus)' } },
+                        x: { title: { display: true, text: xAxisLabel } },
                         y: {
                             type: 'logarithmic',
                             title: { display: true, text: 'Seção de Choque Diferencial dσ/dΩ (m²/sr)' },
-                            // Add Number.EPSILON to avoid log(0) or log(negative) if data is exactly zero or negative
+                            min: yMin, // Usar o min calculado dinamicamente
+                            max: yMax, // Usar o max calculado dinamicamente
                             ticks: { callback: function(value) { return Number(value).toExponential(0); } }
                         }
                     }
@@ -565,13 +1032,158 @@
             if (paramGroups[selectedPotential]) {
                 paramGroups[selectedPotential].classList.add('active');
             }
-            // No need to call updateCharts here, it's called after toggleParamInputs
+            // Auto-ajustar energia e ângulo APENAS ao trocar o potencial no dropdown
+            applyDefaultSettings();
+        }
+
+        // --- Função para alternar entre controles de ângulo e energia ---
+        function togglePlotTypeControls() {
+            const plotType = plotTypeSelect.value;
+
+            if (plotType === 'angle') {
+                angleRangeControls.classList.add('active');
+                energyRangeControls.classList.remove('active');
+                particleEnergySingleGroup.style.display = 'flex';
+                thetaSingleGroup.style.display = 'none';
+            } else { // energy
+                angleRangeControls.classList.remove('active');
+                energyRangeControls.classList.add('active');
+                particleEnergySingleGroup.style.display = 'none';
+                thetaSingleGroup.style.display = 'flex';
+            }
+            applyDefaultSettings(); // Reapply defaults based on new plot type
+        }
+
+        // --- Nova função para aplicar os parâmetros default de energia e ângulo ---
+        function applyDefaultSettings() {
+            const selectedPotential = potentialSelect.value;
+            const defaults = potentialDefaultParams[selectedPotential];
+            const plotType = plotTypeSelect.value;
+
+            if (defaults) {
+                if (plotType === 'angle') {
+                    particleEnergySingleInput.value = defaults.particleEnergy;
+                    thetaMinInput.value = defaults.thetaMin;
+                    thetaMaxInput.value = defaults.thetaMax;
+                } else { // plotType === 'energy'
+                    thetaSingleInput.value = defaults.thetaSingle;
+                    particleEnergyMinInput.value = defaults.particleEnergyMin;
+                    particleEnergyMaxInput.value = defaults.particleEnergyMax;
+                }
+            }
+            updateCharts(); 
+        }
+
+        // --- Função para Exportar Dados para Excel ---
+        function exportarDados() {
+            const selectedPotential = potentialSelect.value;
+            let nomePotencialFormatado = selectedPotential.replace(/_/g, " ").replace(/\b\w/g, char => char.toUpperCase());
+            if (selectedPotential === 'rutherford') nomePotencialFormatado = 'Rutherford (Coulomb)';
+            if (selectedPotential === 'soft_sphere_repulsive') nomePotencialFormatado = 'Esfera Mole Repulsiva (Tipo 1/r)';
+            if (selectedPotential === 'finite_square_well') nomePotencialFormatado = 'Poço Quadrado Finito';
+            if (selectedPotential === 'woods_saxon') nomePotencialFormatado = 'Woods-Saxon';
+            if (selectedPotential === 'lennard_jones') nomePotencialFormatado = 'Lennard-Jones';
+            if (selectedPotential === 'hydrogen_atom') nomePotencialFormatado = 'Átomo de Hidrogênio';
+
+            let xAxisHeader = (currentPlotType === 'angle') ? "Ângulo (°)" : "Energia (eV)";
+            let fixedParamHeader = (currentPlotType === 'angle') ? "Energia Fixa (eV)" : "Ângulo Fixo (°)";
+            let fixedParamValue = (currentPlotType === 'angle') ? particleEnergySingleInput.value : thetaSingleInput.value;
+
+
+            // Dados dos gráficos
+            const dadosGraficos = [
+                [xAxisHeader, "Seção de Choque Analítica (m²/sr)", "Seção de Choque MC (m²/sr)"]
+            ];
+            for (let i = 0; i < currentXLabels.length; i++) {
+                dadosGraficos.push([
+                    currentXLabels[i],
+                    currentCrossSectionBornAnalytical[i],
+                    currentCrossSectionMCMean[i]
+                ]);
+            }
+
+            // Parâmetros da simulação
+            const parametros = [
+                ["Parâmetro", "Valor", "Unidade"]
+            ];
+            parametros.push(["Potencial", nomePotencialFormatado, ""]);
+            parametros.push(["Tipo de Plot", (currentPlotType === 'angle' ? "Ângulo" : "Energia"), ""]);
+            parametros.push([fixedParamHeader, fixedParamValue, (currentPlotType === 'angle' ? "eV" : "°")]);
+            if (currentPlotType === 'angle') {
+                parametros.push(["Ângulo Mínimo", thetaMinInput.value, "°"]);
+                parametros.push(["Ângulo Máximo", thetaMaxInput.value, "°"]);
+                parametros.push(["Número de Pontos de Ângulo", numThetaPointsInput.value, ""]);
+            } else {
+                parametros.push(["Energia Mínima", particleEnergyMinInput.value, "eV"]);
+                parametros.push(["Energia Máxima", particleEnergyMaxInput.value, "eV"]);
+                parametros.push(["Número de Pontos de Energia", numEnergyPointsInput.value, ""]);
+            }
+            parametros.push(["Amostras Monte Carlo", numMCSamplesInput.value, ""]);
+
+            // Adicionar parâmetros específicos do potencial
+            switch (selectedPotential) {
+                case 'rutherford':
+                    parametros.push(["Carga Z1", document.getElementById('rutherfordZ1').value, ""]);
+                    parametros.push(["Carga Z2", document.getElementById('rutherfordZ2').value, ""]);
+                    break;
+                case 'yukawa':
+                    parametros.push(["Parâmetro g", document.getElementById('yukawaG').value, ""]);
+                    parametros.push(["Parâmetro μ", document.getElementById('yukawaMu').value, "m⁻¹"]);
+                    break;
+                case 'gaussian':
+                    parametros.push(["Parâmetro A", document.getElementById('gaussianA').value, ""]);
+                    parametros.push(["Parâmetro α", document.getElementById('gaussianAlpha').value, "m⁻²"]);
+                    break;
+                case 'soft_sphere_repulsive':
+                    parametros.push(["V0*R", document.getElementById('softSphereV0R').value, "J.m"]);
+                    break;
+                case 'finite_square_well':
+                    parametros.push(["Profundidade V0", document.getElementById('finiteWellV0').value, "J"]);
+                    parametros.push(["Raio a", document.getElementById('finiteWellA').value, "m"]);
+                    break;
+                case 'woods_saxon':
+                    parametros.push(["V0", document.getElementById('woodsSaxonV0').value, "J"]);
+                    parametros.push(["Raio R", document.getElementById('woodsSaxonR').value, "m"]);
+                    parametros.push(["Difusividade a", document.getElementById('woodsSaxona').value, "m"]);
+                    break;
+                case 'lennard_jones':
+                    parametros.push(["Epsilon", document.getElementById('lennardJonesEpsilon').value, "J"]);
+                    parametros.push(["Sigma", document.getElementById('lennardJonesSigma').value, "m"]);
+                    break;
+                case 'morse':
+                    parametros.push(["Profundidade De", document.getElementById('morseDe').value, "J"]);
+                    parametros.push(["Largura a", document.getElementById('morsea').value, "m⁻¹"]);
+                    parametros.push(["Equilíbrio re", document.getElementById('morsere').value, "m"]);
+                    break;
+            }
+
+
+            const wb = XLSX.utils.book_new();
+            const ws_graficos = XLSX.utils.aoa_to_sheet(dadosGraficos);
+            const ws_parametros = XLSX.utils.aoa_to_sheet(parametros);
+
+            XLSX.utils.book_append_sheet(wb, ws_graficos, "Dados_Graficos");
+            XLSX.utils.book_append_sheet(wb, ws_parametros, "Parametros_Simulacao");
+
+            const filename = `dados_simulacao_${nomePotencialFormatado.replace(/[^a-zA-Z0-9_]/g, '')}.xlsx`;
+            XLSX.writeFile(wb, filename);
         }
 
         // --- Event Listeners ---
-        potentialSelect.addEventListener('change', toggleParamInputs);
-        potentialSelect.addEventListener('change', updateCharts); // Call updateCharts on potential change
-        particleEnergyInput.addEventListener('input', updateCharts);
+        // When potential changes, adjust param inputs and apply defaults
+        potentialSelect.addEventListener('change', toggleParamInputs); 
+
+        // When plot type changes, adjust controls and apply defaults
+        plotTypeSelect.addEventListener('change', togglePlotTypeControls);
+
+        // For other inputs, just recalculate and update charts with current values.
+        particleEnergySingleInput.addEventListener('input', updateCharts);
+        thetaSingleInput.addEventListener('input', updateCharts);
+        
+        particleEnergyMinInput.addEventListener('input', updateCharts);
+        particleEnergyMaxInput.addEventListener('input', updateCharts);
+        numEnergyPointsInput.addEventListener('input', updateCharts);
+
         thetaMinInput.addEventListener('input', updateCharts);
         thetaMaxInput.addEventListener('input', updateCharts);
         numThetaPointsInput.addEventListener('input', updateCharts);
@@ -580,10 +1192,13 @@
         document.querySelectorAll('.param-inputs input[type="number"]').forEach(input => {
             input.addEventListener('input', updateCharts);
         });
-
-        // Inicializa a página
-        toggleParamInputs(); // This will set the correct parameter inputs initially
-        updateCharts();      // This will draw the charts initially
+         
+        // Initialize the page
+        // This will set the initial parameters and draw the chart for the first time.
+        togglePlotTypeControls(); // Set initial plot type and controls visibility
+        toggleParamInputs(); // Set initial potential parameters and trigger chart update
     </script>
+
+
 </body>
 </html>
