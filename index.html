@@ -289,7 +289,11 @@
             <br>
             <span id="VqEquation">$$ V(q) = \frac{Z_1 Z_2 e^2}{\epsilon_0 q^2} $$</span>
         </div>
-
+        
+        <div style="text-align: center; margin-top: 15px; margin-bottom: 25px;">
+            <a id="potentialLink" href="#" target="_blank"></a>
+        </div>
+       
         <h2>Resultado Analítico (Aproximação de Born)</h2>
         <div class="chart-container">
             <canvas id="analyticalCrossSectionChart"></canvas>
@@ -312,6 +316,7 @@
         const e = 1.602176634e-19;   // C (carga elementar)
         const epsilon_0 = 8.8541878128e-12; // F/m (permissividade do vácuo)
         const a0 = 5.29177210903e-11; // m (Raio de Bohr)
+
 
         // Referências aos elementos HTML
         const potentialSelect = document.getElementById('potentialSelect');
@@ -559,7 +564,6 @@
             'woods_saxon': `$$ V(q) = 4 \\pi \\int_0^{\\infty} r^2 \\frac{V_0}{1 + e^{(r-R)/a}} \\frac{\\sin(qr)}{qr} dr $$`,
             'lennard_jones': `$$ V(q) = 4 \\pi \\int_0^{\\infty} r^2 \\left( 4\\epsilon \\left[ \\left(\\frac{\\sigma}{r}\\right)^{12} - \\left(\\frac{\\sigma}{r}\\right)^{6} \\right] \\right) \\frac{\\sin(qr)}{qr} dr $$`,
             'morse': `$$ V(q) = 4 \\pi \\int_0^{\\infty} r^2 D_e(1 - e^{-a(r-r_e)})^2 \\frac{\\sin(qr)}{qr} dr $$`
-        
         };
 
         // --- Valores de parâmetros default para cada potencial para autoajuste ---
@@ -623,16 +627,16 @@
             'lennard_jones': {
                 particleEnergy: 0.1, // eV (100 meV), típico para interações moleculares de baixa energia
                 thetaMin: 0.01,
-                thetaMax: 180,
-                thetaSingle: 90,
+                thetaMax: 45,
+                thetaSingle: 10,
                 particleEnergyMin: 0.001,
-                particleEnergyMax: 1
+                particleEnergyMax: 10
             },
             'morse': {
-                particleEnergy: 5, // eV (50 meV), típico para interações moleculares
-                thetaMin: 0.01,
-                thetaMax: 180,
-                thetaSingle: 90,
+                particleEnergy: 0.05, // eV (50 meV), típico para interações moleculares
+                thetaMin: 0.1,
+                thetaMax: 90,
+                thetaSingle: 10,
                 particleEnergyMin: 0.1,
                 particleEnergyMax: 20
             }
@@ -1194,11 +1198,42 @@
             input.addEventListener('input', updateCharts);
         });
          
+        
+        // Add the new link related constants and event listener here
+        const potentialLinkMap = {
+            'rutherford': { text: 'Wikipédia - Modelo Atômico de Rutherford', url: 'https://pt.wikipedia.org/wiki/Modelo_at%C3%B4mico_de_Rutherford' },
+            'yukawa': { text: 'The Yukawa Relation of Particle Mass and Spatial Scale for the Nuclear Force', url: 'https://www.sjsu.edu/faculty/watkins/yukawa3.htm' },
+            'gaussian': { text: 'Gaussian function - Wikipedia', url: 'https://en.wikipedia.org/wiki/Gaussian_function' },
+            'soft_sphere_repulsive': { text: 'Soft spheres make more mesophases - Princeton University', url: 'https://www.princeton.edu/~akosmrlj/pdf/2007_Glaser_EPL.pdf' },
+            'finite_square_well': { text: 'Finite potential well - Wikipedia', url: 'https://en.wikipedia.org/wiki/Finite_potential_well' },
+            'hydrogen_atom': { text: 'The hydrogen atom - University of Tennessee, Knoxville', url: 'https://labs.phys.utk.edu/mbreinig/phys222core/modules/m11/hydrogen_atom.html' },
+            'woods_saxon': { text: 'Woods–Saxon potential - Wikipedia', url: 'https://en.wikipedia.org/wiki/Woods%E2%80%93Saxon_potential' },
+            'lennard_jones': { text: 'Lennard-Jones Potential - Chemistry LibreTexts', url: 'https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Supplemental_Modules_(Physical_and_Theoretical_Chemistry)/Physical_Properties_of_Matter/Atomic_and_Molecular_Properties/Intermolecular_Forces/Specific_Interactions/Lennard-Jones_Potential' },
+            'morse': { text: 'Potencial Morse – Wikipédia', url: 'https://pt.wikipedia.org/wiki/Potencial_Morse' }
+        };
+
+        const potentialLinkElement = document.getElementById('potentialLink');
+        
+        // Add this event listener
+        potentialSelect.addEventListener('change', () => {
+            const selected = potentialSelect.value;
+            const linkData = potentialLinkMap[selected]; // Renomeado para linkData para clareza
+            if (linkData) {
+                potentialLinkElement.href = linkData.url; // CORREÇÃO AQUI: Acessar a propriedade .url
+                potentialLinkElement.textContent = `Saiba mais sobre o potencial: ${linkData.text}`; // Melhoria: Usar o texto do link
+            } else {
+                potentialLinkElement.href = '#';
+                potentialLinkElement.textContent = 'Este potencial é idealizado e não possui link explicativo específico.';
+            }
+        });
         // Initialize the page
         // This will set the initial parameters and draw the chart for the first time.
         togglePlotTypeControls(); // Set initial plot type and controls visibility
         toggleParamInputs(); // Set initial potential parameters and trigger chart update
+        // Add this line after the initial calls to ensure the link is set on page load.
+        potentialSelect.dispatchEvent(new Event('change')); // Trigger the change event once on load
     </script>
+
 
 </body>
 </html>
