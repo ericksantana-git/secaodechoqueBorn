@@ -33,7 +33,7 @@
         }
         .controls {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr 1fr));
             gap: 15px;
             margin-bottom: 30px;
         }
@@ -633,12 +633,12 @@
                 particleEnergyMax: 10
             },
             'morse': {
-                particleEnergy: 0.05, // eV (50 meV), típico para interações moleculares
-                thetaMin: 0.1,
+                particleEnergy: 5, // eV (50 meV), típico para interações moleculares
+                thetaMin: 0.01,
                 thetaMax: 90,
                 thetaSingle: 10,
-                particleEnergyMin: 0.1,
-                particleEnergyMax: 20
+                particleEnergyMin: 0.001,
+                particleEnergyMax: 100
             }
         };
 
@@ -720,8 +720,8 @@
                     break;
                 case 'morse':
                     mc_potential_params_std_dev.De_m = base_params.De_m * default_medium_std_dev_factor;
-                    mc_potential_params_std_dev.a_m = Math.max(Number.EPSILON, randomNormal(base_params.a_m, base_params.a_m * default_small_std_dev_factor));
-                    mc_potential_params_std_dev.re_m = Math.max(Number.EPSILON, randomNormal(base_params.re_m, base_params.re_m * default_small_std_dev_factor));
+                    mc_potential_params_std_dev.a_m = Math.max(Number.EPSILON, base_params.a_m * default_small_std_dev_factor);
+                    mc_potential_params_std_dev.re_m = Math.max(Number.EPSILON, base_params.re_m * default_small_std_dev_factor);
                     break;
             }
 
