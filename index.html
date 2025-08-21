@@ -124,7 +124,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Simulador de Espalhamento Quântico (com Monte Carlo)</h1>
+        <h1>Seção de Choque Diferencial na Primeira Aproximação de Born com Método Monte Carlo</h1>
         
         <div class="control-section">
             <h2>Configurações da Simulação</h2>
@@ -144,7 +144,7 @@
              <div class="param-grid">
                 <div>
                     <label for="mc_samples">Amostras Monte Carlo (N):</label>
-                    <input type="number" id="mc_samples" value="50000" min="1000" step="1000">
+                    <input type="number" id="mc_samples" value="100000" min="10" step="10">
                 </div>
             </div>
             
@@ -191,7 +191,7 @@ const potentialData = {
         params: [
             { id: 'V0_strength_MeV_fm', label: 'Força V₀·a (MeV·fm)', value: 60, min: 1e-6 },
             { id: 'a_fm', label: 'Alcance a (fm)', value: 1.4, min: 1e-6 },
-            { id: 'E_MeV', label: 'Energia (MeV)', value: 100, min: 1e-6 }
+            { id: 'E_MeV', label: 'Energia (MeV)', value: 10, min: 1e-6 }
         ]
     },
     gaussiano: {
@@ -200,7 +200,7 @@ const potentialData = {
         params: [
             { id: 'V0_MeV', label: 'Profundidade V₀ (MeV)', value: 40, min: 1e-6 },
             { id: 'a_fm', label: 'Largura a (fm)', value: 4.2, min: 1e-6 },
-            { id: 'E_MeV', label: 'Energia (MeV)', value: 100, min: 1e-6 }
+            { id: 'E_MeV', label: 'Energia (MeV)', value: 1, min: 1e-6 }
         ]
     },
      woods_saxon: {
@@ -334,7 +334,7 @@ def simulate(V0_MeV, A, E_MeV, N_samples):
     angles_deg = np.linspace(1, 40, 100)
     cs_ana = [analytical_cs(t) for t in np.radians(angles_deg)]
     
-    mc_angles_deg = np.linspace(2, 40, 20)
+    mc_angles_deg = np.linspace(1, 40, 100)
     cs_mc = [monte_carlo_cs(t, int(N_samples/10)) for t in np.radians(mc_angles_deg)]
 
     plt.figure(figsize=(9, 6))
@@ -396,7 +396,7 @@ def simulate(V0_strength_MeV_fm, a_fm, E_MeV, N_samples):
     angles_deg_ana = np.linspace(1, 90, 100)
     cross_sections_analytical = [analytical_cross_section_yukawa(t) for t in np.radians(angles_deg_ana)]
     
-    angles_deg_mc = np.linspace(5, 90, 20)
+    angles_deg_mc = np.linspace(5, 90, 40)
     cross_sections_mc = [differential_cross_section_yukawa_mc(t) for t in np.radians(angles_deg_mc)]
 
     plt.figure(figsize=(9, 6))
@@ -464,12 +464,12 @@ def simulate(V0_MeV, a_fm, E_MeV, N_samples):
     angles_deg = np.linspace(1, 90, 100)
     cs_analytical = [analytical_cross_section_gaussian(t) for t in np.radians(angles_deg)]
     
-    mc_angles_deg = np.linspace(5, 90, 20)
+    mc_angles_deg = np.linspace(1, 90, 100)
     cs_mc = [differential_cross_section_gaussian_mc(t) for t in np.radians(mc_angles_deg)]
 
     plt.figure(figsize=(9, 6))
-    plt.plot(angles_deg, cs_analytical, label='Analítico (Gaussiano)', color='green', lw=2)
-    plt.plot(mc_angles_deg, cs_mc, 'o', label=f'Monte Carlo (N={N})', color='darkgreen')
+    plt.plot(angles_deg, cs_analytical, label='Analítico (Gaussiano)', color='red', lw=2)
+    plt.plot(mc_angles_deg, cs_mc, 'o', label=f'Monte Carlo (N={N})', color='blue')
     plt.yscale('log')
     plt.title(f'Espalhamento Gaussiano (E={E_MeV} MeV)')
     plt.xlabel("Ângulo de espalhamento θ (graus)")
@@ -530,7 +530,7 @@ def simulate(potential_type, N_samples, **params):
         theta_ana = np.linspace(0.02, np.pi, 100)
         cs_ana = [numerical_cs(t) for t in theta_ana]
         
-        theta_mc_deg = np.linspace(5, 175, 15)
+        theta_mc_deg = np.linspace(5, 175, 100)
         cs_mc = [monte_carlo_cs(t, int(N_samples/10)) for t in np.radians(theta_mc_deg)]
 
         plt.figure(figsize=(9, 6))
@@ -576,13 +576,13 @@ def simulate(potential_type, N_samples, **params):
         theta_ana = np.linspace(0.02, np.pi, 100)
         cs_ana = [numerical_cs(t) for t in theta_ana]
         
-        theta_mc_rad = np.linspace(0.02, np.pi, 20)
+        theta_mc_rad = np.linspace(0.02, np.pi, 100)
         cs_mc = [monte_carlo_cs(t, int(N_samples/10)) for t in theta_mc_rad]
         
         plt.figure(figsize=(9, 6))
         plt.plot(np.degrees(theta_ana), cs_ana, label='Born (Integração Numérica)', lw=2, color='red')
-        plt.plot(np.degrees(theta_mc_rad), cs_mc, label=f'Born (Monte Carlo N={N_samples})', lw=2, linestyle='--', color='blue')
-    
+        plt.plot(np.degrees(theta_mc_rad), cs_mc,'o', label=f'Born (Monte Carlo N={N_samples})', color='blue')
+        plt.yscale('log')
     plt.xlabel('Ângulo de espalhamento (graus)')
     plt.ylabel('dσ/dΩ [m²/sr]')
     plt.title(title)
