@@ -14,7 +14,12 @@
             margin: 0;
             padding: 20px;
             display: flex;
-            justify-content: center;
+            flex-direction: column; /* Organiza os itens em coluna */
+            align-items: center; /* Centraliza os itens horizontalmente */
+        }
+        .main-logo {
+            max-width: 400px;
+            margin-bottom: 20px;
         }
         .container {
             max-width: 900px;
@@ -123,6 +128,9 @@
     </style>
 </head>
 <body>
+    
+    <img src="MARCA_IFBA_HORIZONTAL_completa_CMYK_IFBA.png" alt="Logo do Instituto Federal da Bahia - IFBA" class="main-logo">
+
     <div class="container">
         <h1>Seção de Choque Diferencial na Primeira Aproximação de Born com Método Monte Carlo</h1>
         
@@ -144,7 +152,7 @@
              <div class="param-grid">
                 <div>
                     <label for="mc_samples">Amostras Monte Carlo (N):</label>
-                    <input type="number" id="mc_samples" value="100000" min="10" step="10">
+                    <input type="number" id="mc_samples" value="100000" min="1" step="10">
                 </div>
             </div>
             
@@ -156,6 +164,8 @@
             <p>A linha contínua representa o cálculo teórico (analítico ou numérico) e os pontos representam uma simulação via <strong>Método Monte Carlo</strong>.</p>
             <div id="potential-equation-container" class="equation-container">
                 </div>
+            <div id="potential-link-container" class="equation-container">
+            </div>
         </div>
 
         <div class="output-section">
@@ -170,6 +180,7 @@ const potentialData = {
     rutherford: {
         name: "Rutherford (Coulomb)",
         equation: "https://latex.codecogs.com/png.latex?%5Cdpi%7B150%7D%20V(r)%20%3D%20%5Cfrac%7BZ_1%20Z_2%20e%5E2%7D%7B4%5Cpi%5Cepsilon_0%20r%7D",
+        link: "https://pt.wikipedia.org/wiki/Dispers%C3%A3o_de_Rutherford",
         params: [
             { id: 'Z1', label: 'Carga Projétil (Z1)', value: 2, min: -1000 },
             { id: 'Z2', label: 'Carga Alvo (Z2)', value: 79, min: -1000 },
@@ -179,6 +190,7 @@ const potentialData = {
     poco_quadrado: {
         name: "Poço Quadrado Finito",
         equation: "https://latex.codecogs.com/png.latex?%5Cdpi%7B150%7D%20V(r)%20%3D%20%5Cbegin%7Bcases%7D%20-V_0%20%26%20%5Ctext%7Bse%20%7D%20r%20%5Cle%20R%20%5C%5C%200%20%26%20%5Ctext%7Bse%20%7D%20r%20%3E%20R%20%5Cend%7Bcases%7D",
+        link: "https://pt.wikipedia.org/wiki/Po%C3%A7o_de_potencial",
         params: [
             { id: 'V0_MeV', label: 'Profundidade V₀ (MeV)', value: 40, min: 1e-6 },
             { id: 'A', label: 'Número de Massa (A)', value: 48, min: 1 },
@@ -188,6 +200,7 @@ const potentialData = {
     yukawa: {
         name: "Yukawa",
         equation: "https://latex.codecogs.com/png.latex?%5Cdpi%7B150%7D%20V(r)%20%3D%20-V_0%20%5Cfrac%7Be%5E%7B-r/a%7D%7D%7Br%7D",
+        link: "https://pt.wikipedia.org/wiki/Potencial_de_Yukawa",
         params: [
             { id: 'V0_strength_MeV_fm', label: 'Força V₀·a (MeV·fm)', value: 60, min: 1e-6 },
             { id: 'a_fm', label: 'Alcance a (fm)', value: 1.4, min: 1e-6 },
@@ -197,6 +210,7 @@ const potentialData = {
     gaussiano: {
         name: "Gaussiano",
         equation: "https://latex.codecogs.com/png.latex?%5Cdpi%7B150%7D%20V(r)%20%3D%20-V_0%20e%5E%7B-(r/a)%5E2%7D",
+        link: "https://pt.wikipedia.org/wiki/Potencial_gaussiano",
         params: [
             { id: 'V0_MeV', label: 'Profundidade V₀ (MeV)', value: 40, min: 1e-6 },
             { id: 'a_fm', label: 'Largura a (fm)', value: 4.2, min: 1e-6 },
@@ -206,6 +220,7 @@ const potentialData = {
      woods_saxon: {
         name: "Woods-Saxon",
         equation: "https://latex.codecogs.com/png.latex?%5Cdpi%7B150%7D%20V(r)%20%3D%20-%5Cfrac%7BV_0%7D%7B1%20&plus;%20e%5E%7B(r-R)/a%7D%7D",
+        link: "https://en.wikipedia.org/wiki/Woods%E2%80%93Saxon_potential",
         params: [
             { id: 'V0_MeV', label: 'Profundidade V₀ (MeV)', value: 50, min: 1e-6 },
             { id: 'R_fm', label: 'Raio R (fm)', value: 5, min: 1e-6 },
@@ -216,6 +231,7 @@ const potentialData = {
     lennard_jones: {
         name: "Lennard-Jones",
         equation: "https://latex.codecogs.com/png.latex?%5Cdpi%7B150%7D%20V(r)%20%3D%204%5Cepsilon%5Cleft%5B%20%5Cleft(%5Cfrac%7B%5Csigma%7D%7Br%7D%5Cright)%5E%7B12%7D%20-%20%5Cleft(%5Cfrac%7B%5Csigma%7D%7Br%7D%5Cright)%5E6%20%5Cright%5D",
+        link: "https://pt.wikipedia.org/wiki/Potencial_de_Lennard-Jones",
         params: [
             { id: 'epsilon_eV', label: 'ε (eV)', value: 0.01, min: 1e-9 },
             { id: 'sigma_A', label: 'σ (Angstrom)', value: 3.4, min: 1e-9 },
@@ -225,6 +241,7 @@ const potentialData = {
     morse: {
         name: "Morse",
         equation: "https://latex.codecogs.com/png.latex?%5Cdpi%7B150%7D%20V(r)%20%3D%20D_e%20%5Cleft(e%5E%7B-2a(r-r_e)%7D%20-2e%5E%7B-a(r-r_e)%7D%5Cright)",
+        link: "https://pt.wikipedia.org/wiki/Potencial_de_Morse",
         params: [
             { id: 'De_eV', label: 'Dₑ (eV)', value: 3.0, min: 1e-9 },
             { id: 'a_A_inv', label: 'a (1/Angstrom)', value: 2.0, min: 1e-9 },
@@ -253,7 +270,6 @@ def simulate(Z1, Z2, E_MeV, N_samples):
         safe_theta = np.maximum(theta, 1e-9)
         num = (Z1 * Z2 * e**2 / (4 * np.pi * epsilon_0 * 4 * E_J))**2
         denom = (np.sin(safe_theta / 2))**4
-        # CORREÇÃO: np.divide garante que a saída seja um array simples
         return np.divide(num, denom).flatten()
 
     def sigma_mc(theta_bins, N_local):
@@ -396,7 +412,7 @@ def simulate(V0_strength_MeV_fm, a_fm, E_MeV, N_samples):
     angles_deg_ana = np.linspace(1, 90, 100)
     cross_sections_analytical = [analytical_cross_section_yukawa(t) for t in np.radians(angles_deg_ana)]
     
-    angles_deg_mc = np.linspace(5, 90, 40)
+    angles_deg_mc = np.linspace(1, 90, 100)
     cross_sections_mc = [differential_cross_section_yukawa_mc(t) for t in np.radians(angles_deg_mc)]
 
     plt.figure(figsize=(9, 6))
@@ -583,6 +599,7 @@ def simulate(potential_type, N_samples, **params):
         plt.plot(np.degrees(theta_ana), cs_ana, label='Born (Integração Numérica)', lw=2, color='red')
         plt.plot(np.degrees(theta_mc_rad), cs_mc,'o', label=f'Born (Monte Carlo N={N_samples})', color='blue')
         plt.yscale('log')
+
     plt.xlabel('Ângulo de espalhamento (graus)')
     plt.ylabel('dσ/dΩ [m²/sr]')
     plt.title(title)
@@ -599,10 +616,12 @@ pythonScripts.woods_saxon = genericNumericalScript;
 pythonScripts.lennard_jones = genericNumericalScript;
 pythonScripts.morse = genericNumericalScript;
 
+
 // --- PAGE LOGIC ---
 const select = document.getElementById('potential-select');
 const paramsContainer = document.getElementById('params-container');
 const potentialEquationContainer = document.getElementById('potential-equation-container');
+const potentialLinkContainer = document.getElementById('potential-link-container');
 const runButton = document.getElementById('run-button');
 const statusDiv = document.getElementById('status');
 const plotOutput = document.getElementById('plot-output');
@@ -630,6 +649,8 @@ function updateUI() {
         paramsContainer.appendChild(div);
     });
     potentialEquationContainer.innerHTML = `<img src="${data.equation}" alt="Equação para ${data.name}">`;
+    // Adiciona o link explicativo
+    potentialLinkContainer.innerHTML = `<a href="${data.link}" target="_blank" rel="noopener noreferrer">Saiba mais sobre o Potencial de ${data.name}</a>`;
 }
 
 async function runSimulation() {
@@ -647,7 +668,8 @@ async function runSimulation() {
         });
         params['N_samples'] = parseFloat(document.getElementById('mc_samples').value);
         
-        if (['woods_saxon', 'lennard_jones', 'morse'].includes(selected)){
+        // Adiciona o tipo de potencial APENAS se estiver usando o script genérico
+        if (script === genericNumericalScript){
             params['potential_type'] = selected;
         }
 
