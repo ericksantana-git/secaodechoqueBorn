@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF--8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simulador de Espalhamento Quântico (Final)</title>
     <script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -70,6 +71,7 @@
             font-weight: bold;
             cursor: pointer;
             transition: background-color 0.3s ease;
+            margin-top: 10px; /* Espaçamento entre botões */
         }
         button:hover {
             background-color: #2980b9;
@@ -77,6 +79,13 @@
         button:disabled {
             background-color: #bdc3c7;
             cursor: not-allowed;
+        }
+        #save-button {
+            background-color: #27ae60; /* Cor verde para o botão de salvar */
+            margin-top: 20px; /* Adicionado espaço extra acima do botão salvar */
+        }
+        #save-button:hover {
+            background-color: #229954;
         }
         .equation-container {
             text-align: center;
@@ -101,12 +110,12 @@
             font-weight: bold;
         }
         #status pre {
-            text-align: left; 
-            color: red; 
-            background: #fee; 
-            padding: 10px; 
-            border-radius: 5px; 
-            white-space: pre-wrap; 
+            text-align: left;
+            color: red;
+            background: #fee;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
             word-wrap: break-word;
             margin-top: 10px;
         }
@@ -128,12 +137,12 @@
     </style>
 </head>
 <body>
-    
+
     <img src="MARCA_IFBA_HORIZONTAL_completa_CMYK_IFBA.png" alt="Logo do Instituto Federal da Bahia - IFBA" class="main-logo">
 
     <div class="container">
         <h1>Seção de Choque Diferencial na Primeira Aproximação de Born com Método Monte Carlo</h1>
-        
+
         <div class="control-section">
             <h2>Configurações da Simulação</h2>
             <label for="potential-select">1. Escolha o Potencial de Espalhamento:</label>
@@ -146,8 +155,18 @@
                 <option value="lennard_jones">Lennard-Jones</option>
                 <option value="morse">Morse</option>
             </select>
-            
+
             <label>2. Ajuste os Parâmetros:</label>
+            <div class="param-grid">
+                <div>
+                    <label for="particle-select">Partícula Incidente:</label>
+                    <select id="particle-select"></select>
+                </div>
+                <div>
+                    <label for="target-select">Elemento Alvo:</label>
+                    <select id="target-select"></select>
+                </div>
+            </div>
             <div id="params-container" class="param-grid"></div>
              <div class="param-grid">
                 <div>
@@ -155,7 +174,7 @@
                     <input type="number" id="mc_samples" value="100000" min="1" step="10">
                 </div>
             </div>
-            
+
             <button id="run-button">3. Simular</button>
         </div>
 
@@ -173,17 +192,57 @@
             <div id="status">Selecione os parâmetros e clique em "Simular".</div>
             <div id="plot-output"></div>
         </div>
+        
+        <button id="save-button" disabled>4. Salvar Dados (Excel)</button>
     </div>
 
 <script>
+// --- DATA ---
+const particleData = {
+    // Partículas originais
+    electron: { name: 'Elétron', mass_kg: 9.10938356e-31, charge_z: -1 },
+    proton: { name: 'Próton', mass_kg: 1.6726219e-27, charge_z: 1 },
+    alpha: { name: 'Partícula Alfa (He-4)', mass_kg: 6.64465723e-27, charge_z: 2 },
+
+    // --- Léptons ---
+    muon: { name: 'Múon', mass_kg: 1.883531627e-28, charge_z: -1 },
+    tau: { name: 'Tau', mass_kg: 3.16747e-27, charge_z: -1 },
+
+    // --- Hádrons ---
+    neutron: { name: 'Nêutron', mass_kg: 1.67492749e-27, charge_z: 0 },
+    pion_pos: { name: 'Píon (+)', mass_kg: 2.48807e-28, charge_z: 1 },
+    pion_neg: { name: 'Píon (-)', mass_kg: 2.48807e-28, charge_z: -1 },
+    pion_zero: { name: 'Píon (0)', mass_kg: 2.40618e-28, charge_z: 0 },
+    kaon_pos: { name: 'Kaon (+)', mass_kg: 8.7997e-28, charge_z: 1 },
+    kaon_neg: { name: 'Kaon (-)', mass_kg: 8.7997e-28, charge_z: -1 },
+    kaon_zero: { name: 'Kaon (0)', mass_kg: 8.8701e-28, charge_z: 0 },
+
+    // --- Núcleos Leves e Íons ---
+    deuteron: { name: 'Dêuteron (H-2)', mass_kg: 3.343583719e-27, charge_z: 1 },
+    triton: { name: 'Tríton (H-3)', mass_kg: 5.00735675e-27, charge_z: 1 },
+    helion: { name: 'Hélion (He-3)', mass_kg: 5.0064127e-27, charge_z: 2 },
+    carbon12_ion: { name: 'Íon de Carbono-12', mass_kg: 1.9926468e-26, charge_z: 6 },
+    oxygen16_ion: { name: 'Íon de Oxigênio-16', mass_kg: 2.656018e-26, charge_z: 8 }
+};
+
+const targetData = {
+    H: { name: 'Hidrogênio', Z: 1, A: 1 },  He: { name: 'Hélio', Z: 2, A: 4 },
+    Li: { name: 'Lítio', Z: 3, A: 7 },     Be: { name: 'Berílio', Z: 4, A: 9 },
+    C: { name: 'Carbono', Z: 6, A: 12 },   N: { name: 'Nitrogênio', Z: 7, A: 14 },
+    O: { name: 'Oxigênio', Z: 8, A: 16 },  Al: { name: 'Alumínio', Z: 13, A: 27 },
+    Si: { name: 'Silício', Z: 14, A: 28 }, Ar: { name: 'Argônio', Z: 18, A: 40 },
+    Ca: { name: 'Cálcio', Z: 20, A: 40 },  Fe: { name: 'Ferro', Z: 26, A: 56 },
+    Cu: { name: 'Cobre', Z: 29, A: 64 },   Ag: { name: 'Prata', Z: 47, A: 108 },
+    Au: { name: 'Ouro', Z: 79, A: 197 },   Pb: { name: 'Chumbo', Z: 82, A: 207 },
+    U: { name: 'Urânio', Z: 92, A: 238 }
+};
+
 const potentialData = {
     rutherford: {
         name: "Rutherford (Coulomb)",
         equation: "https://latex.codecogs.com/png.latex?%5Cdpi%7B150%7D%20V(r)%20%3D%20%5Cfrac%7BZ_1%20Z_2%20e%5E2%7D%7B4%5Cpi%5Cepsilon_0%20r%7D",
         link: "https://pt.wikipedia.org/wiki/Dispers%C3%A3o_de_Rutherford",
         params: [
-            { id: 'Z1', label: 'Carga Projétil (Z1)', value: 2, min: -1000 },
-            { id: 'Z2', label: 'Carga Alvo (Z2)', value: 79, min: -1000 },
             { id: 'E_MeV', label: 'Energia (MeV)', value: 5, min: 1e-6 }
         ]
     },
@@ -193,7 +252,6 @@ const potentialData = {
         link: "https://pt.wikipedia.org/wiki/Po%C3%A7o_de_potencial",
         params: [
             { id: 'V0_MeV', label: 'Profundidade V₀ (MeV)', value: 40, min: 1e-6 },
-            { id: 'A', label: 'Número de Massa (A)', value: 48, min: 1 },
             { id: 'E_MeV', label: 'Energia (MeV)', value: 800, min: 1e-6 }
         ]
     },
@@ -258,9 +316,9 @@ const pythonScripts = {};
 pythonScripts.rutherford = `
 import numpy as np
 import matplotlib.pyplot as plt
-import io, base64
+import io, base64, json
 
-def simulate(Z1, Z2, E_MeV, N_samples):
+def simulate(Z1, Z2, E_MeV, N_samples, m_projectile_kg):
     e = 1.60218e-19
     epsilon_0 = 8.854187817e-12
     E_J = E_MeV * 1e6 * e
@@ -314,18 +372,30 @@ def simulate(Z1, Z2, E_MeV, N_samples):
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=100)
     buf.seek(0)
-    return base64.b64encode(buf.read()).decode('utf-8')
+    img_b64 = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close()
+
+    results = {
+        "plot": img_b64,
+        "data": {
+            "angle_ana_deg": np.degrees(theta_ana_rad).tolist(),
+            "cs_ana_m2_sr": sigma_ana_vals.tolist(),
+            "angle_mc_deg": np.degrees(theta_mc_rad).tolist(),
+            "cs_mc_m2_sr": sigma_mc_vals.tolist()
+        }
+    }
+    return json.dumps(results)
 `;
 
 pythonScripts.poco_quadrado = `
 import numpy as np
 import matplotlib.pyplot as plt
-import io, base64
+import io, base64, json
 
-def simulate(V0_MeV, A, E_MeV, N_samples):
-    m_p, hbar, MeV_to_J, r0 = 1.6726e-27, 1.055e-34, 1.602e-13, 1.2e-15
+def simulate(V0_MeV, A, E_MeV, N_samples, m_projectile_kg):
+    hbar, MeV_to_J, r0 = 1.055e-34, 1.602e-13, 1.2e-15
     V0, E, R = V0_MeV * MeV_to_J, E_MeV * MeV_to_J, r0 * A**(1/3)
-    k = np.sqrt(2 * m_p * E) / hbar
+    k = np.sqrt(2 * m_projectile_kg * E) / hbar
     N_samples = int(N_samples)
 
     def analytical_cs(theta):
@@ -333,7 +403,7 @@ def simulate(V0_MeV, A, E_MeV, N_samples):
         if abs(q) < 1e-9: return np.nan
         qR = q * R
         f_q_term = (np.sin(qR) - qR * np.cos(qR)) / q**3
-        return np.abs(2 * m_p * V0 / hbar**2 * f_q_term)**2
+        return np.abs(2 * m_projectile_kg * V0 / hbar**2 * f_q_term)**2
     
     def monte_carlo_cs(theta, N):
         q = 2 * k * np.sin(theta / 2)
@@ -344,14 +414,16 @@ def simulate(V0_MeV, A, E_MeV, N_samples):
         z = r * cos_phi
         integrand = -V0 * np.cos(q * z)
         integral = (4/3) * np.pi * R**3 * np.mean(integrand)
-        amplitude = -m_p / (2 * np.pi * hbar**2) * integral
+        amplitude = -m_projectile_kg / (2 * np.pi * hbar**2) * integral
         return np.abs(amplitude)**2
 
     angles_deg = np.linspace(1, 40, 100)
-    cs_ana = [analytical_cs(t) for t in np.radians(angles_deg)]
+    angles_rad = np.radians(angles_deg)
+    cs_ana = [analytical_cs(t) for t in angles_rad]
     
-    mc_angles_deg = np.linspace(1, 40, 100)
-    cs_mc = [monte_carlo_cs(t, int(N_samples/10)) for t in np.radians(mc_angles_deg)]
+    mc_angles_deg = np.linspace(1, 40, 100) # Reduzido para performance
+    mc_angles_rad = np.radians(mc_angles_deg)
+    cs_mc = [monte_carlo_cs(t, int(N_samples/100)) for t in mc_angles_rad]
 
     plt.figure(figsize=(9, 6))
     plt.plot(angles_deg, cs_ana, label='Analítico (Born)', color='red', lw=2)
@@ -367,17 +439,29 @@ def simulate(V0_MeV, A, E_MeV, N_samples):
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=100)
     buf.seek(0)
-    return base64.b64encode(buf.read()).decode('utf-8')
+    img_b64 = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close()
+
+    results = {
+        "plot": img_b64,
+        "data": {
+            "angle_ana_deg": angles_deg.tolist(),
+            "cs_ana_m2_sr": cs_ana,
+            "angle_mc_deg": mc_angles_deg.tolist(),
+            "cs_mc_m2_sr": cs_mc
+        }
+    }
+    return json.dumps(results)
 `;
 
 pythonScripts.yukawa = `
 import numpy as np
 import matplotlib.pyplot as plt
-import io, base64
+import io, base64, json
 import cmath
 
-def simulate(V0_strength_MeV_fm, a_fm, E_MeV, N_samples):
-    m_p, hbar, MeV_to_J, fm_to_m = 1.6726e-27, 1.055e-34, 1.602e-13, 1e-15
+def simulate(V0_strength_MeV_fm, a_fm, E_MeV, N_samples, m_projectile_kg):
+    hbar, MeV_to_J, fm_to_m = 1.055e-34, 1.602e-13, 1e-15
     E = E_MeV * MeV_to_J
     a_yukawa = a_fm * fm_to_m
     V_strength = V0_strength_MeV_fm * MeV_to_J * fm_to_m
@@ -390,7 +474,7 @@ def simulate(V0_strength_MeV_fm, a_fm, E_MeV, N_samples):
         return -V_strength * np.exp(-norm_r / a_yukawa) / norm_r
 
     def born_amplitude_yukawa_mc(theta):
-        k = np.sqrt(2 * m_p * E) / hbar
+        k = np.sqrt(2 * m_projectile_kg * E) / hbar
         q_mag = 2 * k * np.sin(theta / 2)
         q = np.array([0, 0, q_mag])
         r_samples = np.random.uniform(-R_max, R_max, (N, 3))
@@ -398,22 +482,24 @@ def simulate(V0_strength_MeV_fm, a_fm, E_MeV, N_samples):
         V_values = np.apply_along_axis(V_yukawa, 1, r_samples)
         integrand = np.exp(1j * dot_product) * V_values
         integral = (2*R_max)**3 * np.sum(integrand) / N
-        return -m_p / (2 * np.pi * hbar**2) * integral
+        return -m_projectile_kg / (2 * np.pi * hbar**2) * integral
 
     def differential_cross_section_yukawa_mc(theta):
         return np.abs(born_amplitude_yukawa_mc(theta))**2
 
     def analytical_cross_section_yukawa(theta):
-        k = np.sqrt(2 * m_p * E) / hbar
+        k = np.sqrt(2 * m_projectile_kg * E) / hbar
         q = 2 * k * np.sin(theta / 2)
-        f_q = (2 * m_p * V_strength / hbar**2) / (q**2 + (1/a_yukawa)**2)
+        f_q = (2 * m_projectile_kg * V_strength / hbar**2) / (q**2 + (1/a_yukawa)**2)
         return np.abs(f_q)**2
 
     angles_deg_ana = np.linspace(1, 90, 100)
-    cross_sections_analytical = [analytical_cross_section_yukawa(t) for t in np.radians(angles_deg_ana)]
+    angles_rad_ana = np.radians(angles_deg_ana)
+    cross_sections_analytical = [analytical_cross_section_yukawa(t) for t in angles_rad_ana]
     
-    angles_deg_mc = np.linspace(1, 90, 100)
-    cross_sections_mc = [differential_cross_section_yukawa_mc(t) for t in np.radians(angles_deg_mc)]
+    angles_deg_mc = np.linspace(1, 90, 100) # Reduzido para performance
+    angles_rad_mc = np.radians(angles_deg_mc)
+    cross_sections_mc = [differential_cross_section_yukawa_mc(t) for t in angles_rad_mc]
 
     plt.figure(figsize=(9, 6))
     plt.plot(angles_deg_ana, cross_sections_analytical, label='Analítico (Yukawa)', color='red', lw=2)
@@ -429,16 +515,28 @@ def simulate(V0_strength_MeV_fm, a_fm, E_MeV, N_samples):
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=100)
     buf.seek(0)
-    return base64.b64encode(buf.read()).decode('utf-8')
+    img_b64 = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close()
+
+    results = {
+        "plot": img_b64,
+        "data": {
+            "angle_ana_deg": angles_deg_ana.tolist(),
+            "cs_ana_m2_sr": cross_sections_analytical,
+            "angle_mc_deg": angles_deg_mc.tolist(),
+            "cs_mc_m2_sr": cross_sections_mc
+        }
+    }
+    return json.dumps(results)
 `;
 
 pythonScripts.gaussiano = `
 import numpy as np
 import matplotlib.pyplot as plt
-import io, base64
+import io, base64, json
 
-def simulate(V0_MeV, a_fm, E_MeV, N_samples):
-    m_p, hbar, MeV_to_J, fm_to_m = 1.6726e-27, 1.055e-34, 1.602e-13, 1e-15
+def simulate(V0_MeV, a_fm, E_MeV, N_samples, m_projectile_kg):
+    hbar, MeV_to_J, fm_to_m = 1.055e-34, 1.602e-13, 1e-15
     V0, a_gauss, E = V0_MeV * MeV_to_J, a_fm * fm_to_m, E_MeV * MeV_to_J
     N = int(N_samples)
     R_max = 3 * a_gauss
@@ -448,7 +546,7 @@ def simulate(V0_MeV, a_fm, E_MeV, N_samples):
         return -V0 * np.exp(-(norm_r / a_gauss)**2)
 
     def born_amplitude_gaussian_mc(theta):
-        k = np.sqrt(2 * m_p * E) / hbar
+        k = np.sqrt(2 * m_projectile_kg * E) / hbar
         q_mag = 2 * k * np.sin(theta / 2)
         q = np.array([0, 0, q_mag])
         
@@ -465,23 +563,25 @@ def simulate(V0_MeV, a_fm, E_MeV, N_samples):
         
         volume = (4/3) * np.pi * R_max**3
         integral = volume * np.sum(integrand) / len(r_valid)
-        return -m_p / (2 * np.pi * hbar**2) * integral
+        return -m_projectile_kg / (2 * np.pi * hbar**2) * integral
 
     def differential_cross_section_gaussian_mc(theta):
         return np.abs(born_amplitude_gaussian_mc(theta))**2
 
     def analytical_cross_section_gaussian(theta):
-        k = np.sqrt(2 * m_p * E) / hbar
+        k = np.sqrt(2 * m_projectile_kg * E) / hbar
         q = 2 * k * np.sin(theta / 2)
-        prefactor_f = (m_p * V0 * (np.sqrt(np.pi) * a_gauss)**3) / (2 * np.pi * hbar**2)
+        prefactor_f = (m_projectile_kg * V0 * (np.sqrt(np.pi) * a_gauss)**3) / (2 * np.pi * hbar**2)
         exp_term = np.exp(-(q * a_gauss)**2 / 4)
         return np.abs(prefactor_f * exp_term)**2
 
     angles_deg = np.linspace(1, 90, 100)
-    cs_analytical = [analytical_cross_section_gaussian(t) for t in np.radians(angles_deg)]
+    angles_rad = np.radians(angles_deg)
+    cs_analytical = [analytical_cross_section_gaussian(t) for t in angles_rad]
     
-    mc_angles_deg = np.linspace(1, 90, 100)
-    cs_mc = [differential_cross_section_gaussian_mc(t) for t in np.radians(mc_angles_deg)]
+    mc_angles_deg = np.linspace(1, 90, 100) # Reduzido para performance
+    mc_angles_rad = np.radians(mc_angles_deg)
+    cs_mc = [differential_cross_section_gaussian_mc(t) for t in mc_angles_rad]
 
     plt.figure(figsize=(9, 6))
     plt.plot(angles_deg, cs_analytical, label='Analítico (Gaussiano)', color='red', lw=2)
@@ -497,28 +597,44 @@ def simulate(V0_MeV, a_fm, E_MeV, N_samples):
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=100)
     buf.seek(0)
-    return base64.b64encode(buf.read()).decode('utf-8')
+    img_b64 = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close()
+
+    results = {
+        "plot": img_b64,
+        "data": {
+            "angle_ana_deg": angles_deg.tolist(),
+            "cs_ana_m2_sr": cs_analytical,
+            "angle_mc_deg": mc_angles_deg.tolist(),
+            "cs_mc_m2_sr": cs_mc
+        }
+    }
+    return json.dumps(results)
 `;
 
 const genericNumericalScript = `
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import quad
-import io, base64
+import io, base64, json
 
-def simulate(potential_type, N_samples, **params):
-    hbar, m_p, MeV_to_J, fm_to_m, eV_to_J, A_to_m = 1.05457e-34, 1.6726e-27, 1.602e-13, 1e-15, 1.602e-19, 1e-10
+def simulate(potential_type, N_samples, m_projectile_kg, **params):
+    hbar, MeV_to_J, fm_to_m, eV_to_J, A_to_m = 1.05457e-34, 1.602e-13, 1e-15, 1.602e-19, 1e-10
     N_samples = int(N_samples)
+    m = m_projectile_kg # Use projectile mass
     
+    cs_ana_list, cs_mc_list = [], []
+    theta_ana_deg, theta_mc_deg = [], []
+
     if potential_type == 'woods_saxon' or potential_type == 'morse':
         if potential_type == 'woods_saxon':
             V0, R, a, E_J = params['V0_MeV']*MeV_to_J, params['R_fm']*fm_to_m, params['a_fm']*fm_to_m, params['E_MeV']*MeV_to_J
-            m, r_max = m_p, 20 * fm_to_m
+            r_max = 20 * fm_to_m
             potential = lambda r: -V0 / (1 + np.exp((r - R) / a))
             title = f"Espalhamento Woods-Saxon (E={params['E_MeV']} MeV)"
         else: # Morse
             De, a, re, E_J = params['De_eV']*eV_to_J, params['a_A_inv']/A_to_m, params['re_A']*A_to_m, params['E_eV']*eV_to_J
-            m, r_max = m_p, 5 * re
+            r_max = 5 * re
             potential = lambda r: De * (np.exp(-2 * a * (r - re)) - 2 * np.exp(-a * (r - re)))
             title = f"Espalhamento Morse (E={params['E_eV']} eV)"
 
@@ -543,20 +659,21 @@ def simulate(potential_type, N_samples, **params):
             amplitude = -m / (2 * np.pi * hbar**2) * integral
             return np.abs(amplitude)**2
             
-        theta_ana = np.linspace(0.02, np.pi, 100)
-        cs_ana = [numerical_cs(t) for t in theta_ana]
-        
-        theta_mc_deg = np.linspace(5, 175, 100)
-        cs_mc = [monte_carlo_cs(t, int(N_samples/10)) for t in np.radians(theta_mc_deg)]
+        theta_ana_rad = np.linspace(0.02, np.pi, 100)
+        cs_ana_list = [numerical_cs(t) for t in theta_ana_rad]
+        theta_ana_deg = np.degrees(theta_ana_rad).tolist()
+
+        theta_mc_deg_np = np.linspace(5, 175, 100) # Reduzido para performance
+        cs_mc_list = [monte_carlo_cs(t, int(N_samples/100)) for t in np.radians(theta_mc_deg_np)]
+        theta_mc_deg = theta_mc_deg_np.tolist()
 
         plt.figure(figsize=(9, 6))
-        plt.plot(np.degrees(theta_ana), cs_ana, label='Numérico (Born)', lw=2, color='red')
-        plt.plot(theta_mc_deg, cs_mc, 'o', label=f'Monte Carlo (N={N_samples})', color='blue')
+        plt.plot(theta_ana_deg, cs_ana_list, label='Numérico (Born)', lw=2, color='red')
+        plt.plot(theta_mc_deg, cs_mc_list, 'o', label=f'Monte Carlo (N={N_samples})', color='blue')
         plt.yscale('log')
 
     elif potential_type == 'lennard_jones':
         epsilon, sigma, E_J = params['epsilon_eV']*eV_to_J, params['sigma_A']*A_to_m, params['E_eV']*eV_to_J
-        m = m_p
         title = f"Espalhamento Lennard-Jones (E={params['E_eV']} eV)"
         
         def lennard_jones_pot(r):
@@ -589,15 +706,17 @@ def simulate(potential_type, N_samples, **params):
             f_q = born_amplitude_mc(q, N_local)
             return abs(f_q)**2
         
-        theta_ana = np.linspace(0.02, np.pi, 100)
-        cs_ana = [numerical_cs(t) for t in theta_ana]
+        theta_ana_rad = np.linspace(0.02, np.pi, 100)
+        cs_ana_list = [numerical_cs(t) for t in theta_ana_rad]
+        theta_ana_deg = np.degrees(theta_ana_rad).tolist()
         
-        theta_mc_rad = np.linspace(0.02, np.pi, 100)
-        cs_mc = [monte_carlo_cs(t, int(N_samples/10)) for t in theta_mc_rad]
+        theta_mc_rad = np.linspace(0.02, np.pi, 100) # Reduzido
+        cs_mc_list = [monte_carlo_cs(t, int(N_samples/100)) for t in theta_mc_rad]
+        theta_mc_deg = np.degrees(theta_mc_rad).tolist()
         
         plt.figure(figsize=(9, 6))
-        plt.plot(np.degrees(theta_ana), cs_ana, label='Born (Integração Numérica)', lw=2, color='red')
-        plt.plot(np.degrees(theta_mc_rad), cs_mc,'o', label=f'Born (Monte Carlo N={N_samples})', color='blue')
+        plt.plot(theta_ana_deg, cs_ana_list, label='Born (Integração Numérica)', lw=2, color='red')
+        plt.plot(theta_mc_deg, cs_mc_list,'o', label=f'Born (Monte Carlo N={N_samples})', color='blue')
         plt.yscale('log')
 
     plt.xlabel('Ângulo de espalhamento (graus)')
@@ -609,7 +728,19 @@ def simulate(potential_type, N_samples, **params):
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=100)
     buf.seek(0)
-    return base64.b64encode(buf.read()).decode('utf-8')
+    img_b64 = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close()
+
+    results = {
+        "plot": img_b64,
+        "data": {
+            "angle_ana_deg": theta_ana_deg,
+            "cs_ana_m2_sr": cs_ana_list,
+            "angle_mc_deg": theta_mc_deg,
+            "cs_mc_m2_sr": cs_mc_list
+        }
+    }
+    return json.dumps(results)
 `;
 
 pythonScripts.woods_saxon = genericNumericalScript;
@@ -619,13 +750,35 @@ pythonScripts.morse = genericNumericalScript;
 
 // --- PAGE LOGIC ---
 const select = document.getElementById('potential-select');
+const particleSelect = document.getElementById('particle-select');
+const targetSelect = document.getElementById('target-select');
 const paramsContainer = document.getElementById('params-container');
 const potentialEquationContainer = document.getElementById('potential-equation-container');
 const potentialLinkContainer = document.getElementById('potential-link-container');
 const runButton = document.getElementById('run-button');
+const saveButton = document.getElementById('save-button');
 const statusDiv = document.getElementById('status');
 const plotOutput = document.getElementById('plot-output');
 let pyodide;
+let lastSimulationData = null;
+
+function populateSelects() {
+    for (const key in particleData) {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = particleData[key].name;
+        particleSelect.appendChild(option);
+    }
+    particleSelect.value = 'alpha'; // Padrão
+
+    for (const key in targetData) {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = `${targetData[key].name} (${key})`;
+        targetSelect.appendChild(option);
+    }
+    targetSelect.value = 'Au'; // Padrão
+}
 
 function updateUI() {
     const selected = select.value;
@@ -649,28 +802,45 @@ function updateUI() {
         paramsContainer.appendChild(div);
     });
     potentialEquationContainer.innerHTML = `<img src="${data.equation}" alt="Equação para ${data.name}">`;
-    // Adiciona o link explicativo
     potentialLinkContainer.innerHTML = `<a href="${data.link}" target="_blank" rel="noopener noreferrer">Saiba mais sobre o Potencial de ${data.name}</a>`;
 }
 
 async function runSimulation() {
     statusDiv.textContent = 'Calculando... Por favor, aguarde.';
     runButton.disabled = true;
+    saveButton.disabled = true;
     plotOutput.innerHTML = '';
+    lastSimulationData = null;
 
     try {
-        const selected = select.value;
-        const script = pythonScripts[selected];
+        const selectedPotential = select.value;
+        const script = pythonScripts[selectedPotential];
         
+        // Coleta de parâmetros básicos
         const params = {};
-        potentialData[selected].params.forEach(param => {
+        potentialData[selectedPotential].params.forEach(param => {
             params[param.id] = parseFloat(document.getElementById(param.id).value);
         });
         params['N_samples'] = parseFloat(document.getElementById('mc_samples').value);
+
+        // Coleta de dados da partícula e do alvo
+        const selectedParticleKey = particleSelect.value;
+        const selectedTargetKey = targetSelect.value;
+        const projectile = particleData[selectedParticleKey];
+        const target = targetData[selectedTargetKey];
+
+        params['m_projectile_kg'] = projectile.mass_kg;
+
+        // Adiciona parâmetros específicos do potencial
+        if (selectedPotential === 'rutherford') {
+            params['Z1'] = projectile.charge_z;
+            params['Z2'] = target.Z;
+        } else if (selectedPotential === 'poco_quadrado') {
+            params['A'] = target.A;
+        }
         
-        // Adiciona o tipo de potencial APENAS se estiver usando o script genérico
         if (script === genericNumericalScript){
-            params['potential_type'] = selected;
+            params['potential_type'] = selectedPotential;
         }
 
         await pyodide.runPythonAsync(script);
@@ -678,10 +848,19 @@ async function runSimulation() {
         let pyParams = pyodide.toPy(params);
         pyodide.globals.set("py_params", pyParams);
         
-        const image_base_64 = await pyodide.runPythonAsync("simulate(**py_params)");
+        const result_json = await pyodide.runPythonAsync("simulate(**py_params)");
+        const result_data = JSON.parse(result_json);
         
-        plotOutput.innerHTML = `<img src="data:image/png;base64,${image_base_64}" alt="Gráfico do resultado da simulação"/>`;
+        // Armazena os parâmetros e os dados para salvar
+        lastSimulationData = {
+            parameters: { ...params, "Partícula": projectile.name, "Alvo": target.name },
+            potentialName: potentialData[selectedPotential].name,
+            results: result_data.data
+        };
+        
+        plotOutput.innerHTML = `<img src="data:image/png;base64,${result_data.plot}" alt="Gráfico do resultado da simulação"/>`;
         statusDiv.textContent = 'Simulação concluída com sucesso!';
+        saveButton.disabled = false;
         
         pyParams.destroy();
 
@@ -693,9 +872,62 @@ async function runSimulation() {
     }
 }
 
+function saveDataToExcel() {
+    if (!lastSimulationData) {
+        alert("Não há dados de simulação para salvar.");
+        return;
+    }
+
+    // 1. Criar a aba de Parâmetros
+    const params_ws_data = [
+        ["Parâmetro", "Valor"],
+        ["Tipo de Potencial", lastSimulationData.potentialName]
+    ];
+    for (const key in lastSimulationData.parameters) {
+        if (key !== 'potential_type' && key !== 'm_projectile_kg') {
+            let label = key;
+            // Tenta encontrar um label mais amigável
+            const pData = potentialData[select.value].params.find(p => p.id === key);
+            if(pData) label = pData.label;
+
+            params_ws_data.push([label, lastSimulationData.parameters[key]]);
+        }
+    }
+    const params_ws = XLSX.utils.aoa_to_sheet(params_ws_data);
+
+    // 2. Criar a aba de Resultados
+    const res = lastSimulationData.results;
+    const max_len = Math.max(res.angle_ana_deg.length, res.angle_mc_deg.length);
+    const results_ws_data = [
+        ["Ângulo Analítico (graus)", "dσ/dΩ Analítico (m²/sr)", "Ângulo Monte Carlo (graus)", "dσ/dΩ Monte Carlo (m²/sr)"]
+    ];
+
+    for (let i = 0; i < max_len; i++) {
+        const row = [
+            res.angle_ana_deg[i],
+            res.cs_ana_m2_sr[i],
+            res.angle_mc_deg[i],
+            res.cs_mc_m2_sr[i]
+        ];
+        results_ws_data.push(row);
+    }
+    const results_ws = XLSX.utils.aoa_to_sheet(results_ws_data);
+
+    // 3. Criar o Workbook e adicionar as abas
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, params_ws, "Parâmetros");
+    XLSX.utils.book_append_sheet(wb, results_ws, "Resultados");
+
+    // 4. Salvar o arquivo
+    const potential_filename = lastSimulationData.potentialName.replace(/ /g, '_').toLowerCase();
+    XLSX.writeFile(wb, `resultados_simulacao_${potential_filename}.xlsx`);
+}
+
+
 async function main() {
     statusDiv.textContent = 'Carregando ambiente Python (Pyodide)... Isso pode levar um momento.';
     runButton.disabled = true;
+    saveButton.disabled = true;
     try {
         pyodide = await loadPyodide();
         await pyodide.loadPackage(['numpy', 'matplotlib', 'scipy']);
@@ -709,8 +941,10 @@ async function main() {
 
 select.addEventListener('change', updateUI);
 runButton.addEventListener('click', runSimulation);
+saveButton.addEventListener('click', saveDataToExcel);
 
 document.addEventListener('DOMContentLoaded', () => {
+    populateSelects();
     updateUI();
     main();
 });
